@@ -1,7 +1,5 @@
 # waxmcp
 
-[![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv10%2Finvites%2FNHgNh7HJ6M%3Fwith_counts%3Dtrue&query=%24.approximate_presence_count&suffix=%20online&logo=discord&label=Discord&color=5865F2)](https://discord.gg/NHgNh7HJ6M)
-
 `waxmcp` is an npm launcher for the Wax MCP server.
 
 ## Usage
@@ -10,33 +8,21 @@
 npx -y waxmcp@latest mcp serve
 ```
 
-For Claude Code / Codex installs, prefer:
-
-```bash
-npx -y waxmcp@latest mcp install --scope user
-```
-
-That install flow stages the bundled runtime into a stable local directory and registers the
-staged `wax-mcp` binary, so regular MCP sessions do not keep launching through raw `npx`.
-
-> Note: `waxmcp` currently supports Apple Silicon macOS only (`darwin-arm64`).
-
 To publish a new version:
 
 ```bash
-cd /path/to/Wax/Resources/npm/waxmcp
-npm version patch   # or minor/major/1.2.3 (requires npm publish access)
+cd /path/to/Wax/npm/waxmcp
+npm version patch   # or minor/major/1.2.3
 npm publish --access public
 ```
 
 This repo also ships a release script that updates `version`, syncs
-`Sources/WaxMCPServer/main.swift`'s `serverVersion`, and rebuilds the Darwin binaries
-and resource bundles:
+`Sources/WaxMCPServer/main.swift`'s `serverVersion`, and rebuilds both Darwin binaries:
 
 ```bash
 cd /path/to/Wax
-./scripts/release-waxmcp.sh 0.1.18
-git add Resources/npm/waxmcp/package.json Sources/WaxMCPServer/main.swift Resources/npm/waxmcp/dist
+./scripts/release-waxmcp.sh patch   # or minor / major / 1.2.3
+git add npm/waxmcp/package.json Sources/WaxMCPServer/main.swift npm/waxmcp/dist/darwin-*/wax-cli npm/waxmcp/dist/darwin-*/wax-cli.sha256 npm/waxmcp/dist/darwin-*/wax-mcp npm/waxmcp/dist/darwin-*/wax-mcp.sha256
 git commit -m "release: bump waxmcp version"
 ```
 
@@ -65,21 +51,6 @@ binary using this search order:
 2. Bundled `dist/darwin-arm64/wax-cli` or `dist/darwin-x64/wax-cli`
 3. `wax-cli` in PATH
 4. `./.build/debug/wax-cli` (current working directory)
-
-Vector-capable CLI commands now auto-start and reuse a background daemon by default, so
-coding agents can keep calling normal `wax-cli`/`waxmcp` commands without learning a
-separate workflow.
-
-You can still run the daemon directly when you want an explicit long-lived session:
-
-```bash
-waxmcp daemon --store-path ~/.wax/memory.wax
-```
-
-The daemon keeps one `MemoryOrchestrator` open, so repeated `remember` / `search` / `recall`
-requests do not reload the CoreML embedder every time. Simple text-only usage still runs
-one-shot. Hybrid/vector searches now fail explicitly if vector search is unavailable instead
-of silently degrading to text-only mode.
 
 ## Local development
 

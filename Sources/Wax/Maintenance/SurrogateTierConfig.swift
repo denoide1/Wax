@@ -1,17 +1,17 @@
 import Foundation
 
 /// Configuration for hierarchical surrogate tier token budgets.
-package struct SurrogateTierConfig: Sendable, Equatable {
+public struct SurrogateTierConfig: Sendable, Equatable {
     /// Token budget for full tier
-    package var fullMaxTokens: Int
+    public var fullMaxTokens: Int
     
     /// Token budget for gist tier
-    package var gistMaxTokens: Int
+    public var gistMaxTokens: Int
     
     /// Token budget for micro tier
-    package var microMaxTokens: Int
+    public var microMaxTokens: Int
     
-    package init(
+    public init(
         fullMaxTokens: Int = 100,
         gistMaxTokens: Int = 25,
         microMaxTokens: Int = 8
@@ -22,17 +22,17 @@ package struct SurrogateTierConfig: Sendable, Equatable {
     }
     
     /// Default configuration
-    package static let `default` = SurrogateTierConfig()
+    public static let `default` = SurrogateTierConfig()
     
     /// Compact preset for memory-constrained devices
-    package static let compact = SurrogateTierConfig(
+    public static let compact = SurrogateTierConfig(
         fullMaxTokens: 50,
         gistMaxTokens: 15,
         microMaxTokens: 5
     )
     
     /// Verbose preset for high-fidelity contexts
-    package static let verbose = SurrogateTierConfig(
+    public static let verbose = SurrogateTierConfig(
         fullMaxTokens: 150,
         gistMaxTokens: 40,
         microMaxTokens: 12

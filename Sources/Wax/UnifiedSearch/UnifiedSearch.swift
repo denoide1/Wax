@@ -9,7 +9,7 @@ struct UnifiedSearchEngineOverrides {
     var structuredEngine: FTS5SearchEngine?
 }
 
-package extension Wax {
+public extension Wax {
     func search(_ request: SearchRequest) async throws -> SearchResponse {
         try await search(request, engineOverrides: nil)
     }
@@ -148,27 +148,7 @@ extension Wax {
             if isMetalEngine, !VectorMath.isNormalizedL2(queryEmbedding) {
                 queryEmbedding = VectorMath.normalizeL2(queryEmbedding)
             }
-            let vectorToSearch = queryEmbedding
-            if let timeout = request.vectorSearchTimeout {
-                do {
-                    return try await AsyncTimeout.run(timeout: timeout, operation: "vector search") {
-                        try await vectorEngine.search(vector: vectorToSearch, topK: candidateLimit)
-                    }
-                } catch let error as AsyncTimeout.TimeoutError {
-                    // Hybrid/text modes can degrade to non-vector lanes; vectorOnly should fail hard.
-                    if request.mode == .vectorOnly {
-                        throw error
-                    }
-                    WaxDiagnostics.logSwallowed(
-                        error,
-                        context: "unified search vector lane timeout",
-                        fallback: "fall back to non-vector lanes"
-                    )
-                    return []
-                }
-            } else {
-                return try await vectorEngine.search(vector: queryEmbedding, topK: candidateLimit)
-            }
+            return try await vectorEngine.search(vector: queryEmbedding, topK: candidateLimit)
         }()
 
         async let structuredFrameIdsAsync: [UInt64] = {
@@ -388,7 +368,6 @@ extension Wax {
             let sources: [SearchResponse.Source]
             let snippet: String?
             let rankingDiagnostics: SearchResponse.RankingDiagnostics?
-            let metadata: [String: String]
         }
 
         var pendingResults: [PendingResult] = []
@@ -420,8 +399,7 @@ extension Wax {
                             score: item.score,
                             sources: item.sources,
                             snippet: snippetByFrameId[item.frameId],
-                            rankingDiagnostics: item.rankingDiagnostics,
-                            metadata: meta.metadata?.entries ?? [:]
+                            rankingDiagnostics: item.rankingDiagnostics
                         )
                     )
 
@@ -457,8 +435,7 @@ extension Wax {
                             score: item.score,
                             sources: item.sources,
                             snippet: snippetByFrameId[item.frameId],
-                            rankingDiagnostics: item.rankingDiagnostics,
-                            metadata: meta.metadata?.entries ?? [:]
+                            rankingDiagnostics: item.rankingDiagnostics
                         )
                     )
 
@@ -496,8 +473,7 @@ extension Wax {
                 score: item.score,
                 previewText: previewText,
                 sources: item.sources,
-                rankingDiagnostics: rankingDiagnostics,
-                metadata: item.metadata
+                rankingDiagnostics: rankingDiagnostics
             )
         }
 
@@ -564,8 +540,7 @@ extension Wax {
                     frameId: frameId,
                     score: score,
                     previewText: previewText,
-                    sources: [.timeline],
-                    metadata: meta.metadata?.entries ?? [:]
+                    sources: [.timeline]
                 )
             )
 

@@ -1,51 +1,51 @@
 import Foundation
 
 /// Deterministic binary encoder using little-endian byte order.
-package struct BinaryEncoder {
-    package struct Limits: Sendable {
-        package var maxStringBytes: Int = Constants.maxStringBytes
-        package var maxBlobBytes: Int = Constants.maxBlobBytes
-        package var maxArrayCount: Int = Constants.maxArrayCount
+public struct BinaryEncoder {
+    public struct Limits: Sendable {
+        public var maxStringBytes: Int = Constants.maxStringBytes
+        public var maxBlobBytes: Int = Constants.maxBlobBytes
+        public var maxArrayCount: Int = Constants.maxArrayCount
 
-        package init() {}
+        public init() {}
     }
 
-    package private(set) var data = Data()
+    public private(set) var data = Data()
     private let limits: Limits
 
-    package init(limits: Limits = .init()) {
+    public init(limits: Limits = .init()) {
         self.limits = limits
     }
 
     // MARK: - Primitives
 
-    package mutating func encode(_ value: UInt8) {
+    public mutating func encode(_ value: UInt8) {
         data.append(value)
     }
 
-    package mutating func encode(_ value: UInt16) {
+    public mutating func encode(_ value: UInt16) {
         var le = value.littleEndian
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
     }
 
-    package mutating func encode(_ value: UInt32) {
+    public mutating func encode(_ value: UInt32) {
         var le = value.littleEndian
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
     }
 
-    package mutating func encode(_ value: UInt64) {
+    public mutating func encode(_ value: UInt64) {
         var le = value.littleEndian
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
     }
 
-    package mutating func encode(_ value: Int64) {
+    public mutating func encode(_ value: Int64) {
         var le = value.littleEndian
         withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
     }
 
     // MARK: - Optionals (tag byte + payload)
 
-    package mutating func encode(_ value: UInt8?) {
+    public mutating func encode(_ value: UInt8?) {
         if let value {
             encode(UInt8(1))
             encode(value)
@@ -54,7 +54,7 @@ package struct BinaryEncoder {
         }
     }
 
-    package mutating func encode(_ value: UInt16?) {
+    public mutating func encode(_ value: UInt16?) {
         if let value {
             encode(UInt8(1))
             encode(value)
@@ -63,7 +63,7 @@ package struct BinaryEncoder {
         }
     }
 
-    package mutating func encode(_ value: UInt32?) {
+    public mutating func encode(_ value: UInt32?) {
         if let value {
             encode(UInt8(1))
             encode(value)
@@ -72,7 +72,7 @@ package struct BinaryEncoder {
         }
     }
 
-    package mutating func encode(_ value: UInt64?) {
+    public mutating func encode(_ value: UInt64?) {
         if let value {
             encode(UInt8(1))
             encode(value)
@@ -81,7 +81,7 @@ package struct BinaryEncoder {
         }
     }
 
-    package mutating func encode(_ value: Int64?) {
+    public mutating func encode(_ value: Int64?) {
         if let value {
             encode(UInt8(1))
             encode(value)
@@ -92,7 +92,7 @@ package struct BinaryEncoder {
 
     // MARK: - Variable bytes (UInt32 length)
 
-    package mutating func encodeBytes(_ value: Data) throws {
+    public mutating func encodeBytes(_ value: Data) throws {
         guard value.count <= limits.maxBlobBytes else {
             throw WaxError.encodingError(reason: "byte length \(value.count) exceeds limit \(limits.maxBlobBytes)")
         }
@@ -105,7 +105,7 @@ package struct BinaryEncoder {
 
     // MARK: - Strings (UInt32 byte length + UTF-8 bytes)
 
-    package mutating func encode(_ value: String) throws {
+    public mutating func encode(_ value: String) throws {
         let utf8 = Data(value.utf8)
         guard utf8.count <= limits.maxStringBytes else {
             throw WaxError.encodingError(reason: "string byte length \(utf8.count) exceeds limit \(limits.maxStringBytes)")
@@ -113,7 +113,7 @@ package struct BinaryEncoder {
         try encodeBytes(utf8)
     }
 
-    package mutating func encode(_ value: String?) throws {
+    public mutating func encode(_ value: String?) throws {
         if let value {
             encode(UInt8(1))
             try encode(value)
@@ -124,7 +124,7 @@ package struct BinaryEncoder {
 
     // MARK: - Arrays (UInt32 count)
 
-    package mutating func encode<T>(_ values: [T], encoder: (inout BinaryEncoder, T) throws -> Void) throws {
+    public mutating func encode<T>(_ values: [T], encoder: (inout BinaryEncoder, T) throws -> Void) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -137,7 +137,7 @@ package struct BinaryEncoder {
         }
     }
 
-    package mutating func encode(_ values: [UInt8]) throws {
+    public mutating func encode(_ values: [UInt8]) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -148,7 +148,7 @@ package struct BinaryEncoder {
         data.append(contentsOf: values)
     }
 
-    package mutating func encode(_ values: [UInt16]) throws {
+    public mutating func encode(_ values: [UInt16]) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -159,7 +159,7 @@ package struct BinaryEncoder {
         for value in values { encode(value) }
     }
 
-    package mutating func encode(_ values: [UInt32]) throws {
+    public mutating func encode(_ values: [UInt32]) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -170,7 +170,7 @@ package struct BinaryEncoder {
         for value in values { encode(value) }
     }
 
-    package mutating func encode(_ values: [UInt64]) throws {
+    public mutating func encode(_ values: [UInt64]) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -181,7 +181,7 @@ package struct BinaryEncoder {
         for value in values { encode(value) }
     }
 
-    package mutating func encode(_ values: [Int64]) throws {
+    public mutating func encode(_ values: [Int64]) throws {
         guard values.count <= limits.maxArrayCount else {
             throw WaxError.encodingError(reason: "array count \(values.count) exceeds limit \(limits.maxArrayCount)")
         }
@@ -192,7 +192,7 @@ package struct BinaryEncoder {
         for value in values { encode(value) }
     }
 
-    package mutating func encode(_ values: [String]) throws {
+    public mutating func encode(_ values: [String]) throws {
         try encode(values) { encoder, value in
             try encoder.encode(value)
         }
@@ -200,7 +200,7 @@ package struct BinaryEncoder {
 
     // MARK: - Optionals (tag byte + payload)
 
-    package mutating func encode<T>(_ value: T?, encoder: (inout BinaryEncoder, T) throws -> Void) throws {
+    public mutating func encode<T>(_ value: T?, encoder: (inout BinaryEncoder, T) throws -> Void) throws {
         if let value {
             encode(UInt8(1))
             try encoder(&self, value)
@@ -211,17 +211,13 @@ package struct BinaryEncoder {
 
     // MARK: - Fixed bytes (no length prefix)
 
-    package mutating func encodeFixedBytes(_ value: Data) {
-        data.append(value)
-    }
-
-    package mutating func appendRawBytes(_ value: Data) {
+    public mutating func encodeFixedBytes(_ value: Data) {
         data.append(value)
     }
 
     // MARK: - Padding
 
-    package mutating func pad(to size: Int) {
+    public mutating func pad(to size: Int) {
         let remaining = size - data.count
         if remaining > 0 {
             data.append(Data(repeating: 0, count: remaining))

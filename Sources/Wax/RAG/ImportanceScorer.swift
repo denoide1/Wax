@@ -1,38 +1,38 @@
 import Foundation
 
 /// Importance score for a frame, used for tier selection.
-package struct ImportanceScore: Sendable {
+public struct ImportanceScore: Sendable {
     /// Combined score (0.0 - 1.0)
-    package var score: Float
+    public var score: Float
     
     /// Age component contribution
-    package var ageComponent: Float
+    public var ageComponent: Float
     
     /// Access frequency component contribution
-    package var frequencyComponent: Float
+    public var frequencyComponent: Float
     
     /// Recency of access component contribution
-    package var recencyComponent: Float
+    public var recencyComponent: Float
 }
 
 /// Configuration for importance scoring weights and decay rates.
-package struct ImportanceScoringConfig: Sendable, Equatable {
+public struct ImportanceScoringConfig: Sendable, Equatable {
     /// Weight for memory age component (0.0 - 1.0)
-    package var ageWeight: Float
+    public var ageWeight: Float
     
     /// Weight for access frequency component (0.0 - 1.0)
-    package var frequencyWeight: Float
+    public var frequencyWeight: Float
     
     /// Weight for recency of last access component (0.0 - 1.0)
-    package var recencyWeight: Float
+    public var recencyWeight: Float
     
     /// Half-life for age decay in hours (age at which importance drops to ~37%)
-    package var ageHalfLifeHours: Float
+    public var ageHalfLifeHours: Float
     
     /// Half-life for recency decay in hours
-    package var recencyHalfLifeHours: Float
+    public var recencyHalfLifeHours: Float
     
-    package init(
+    public init(
         ageWeight: Float = 0.3,
         frequencyWeight: Float = 0.4,
         recencyWeight: Float = 0.3,
@@ -46,14 +46,14 @@ package struct ImportanceScoringConfig: Sendable, Equatable {
         self.recencyHalfLifeHours = recencyHalfLifeHours
     }
     
-    package static let `default` = ImportanceScoringConfig()
+    public static let `default` = ImportanceScoringConfig()
 }
 
 /// Calculates importance scores for frames based on age and access patterns.
-package struct ImportanceScorer: Sendable {
-    package var config: ImportanceScoringConfig
+public struct ImportanceScorer: Sendable {
+    public var config: ImportanceScoringConfig
     
-    package init(config: ImportanceScoringConfig = .default) {
+    public init(config: ImportanceScoringConfig = .default) {
         self.config = config
     }
     
@@ -64,7 +64,7 @@ package struct ImportanceScorer: Sendable {
     ///   - accessStats: Optional access statistics for the frame
     ///   - nowMs: Current time (milliseconds)
     /// - Returns: Importance score with component breakdown
-    package func score(
+    public func score(
         frameTimestamp: Int64,
         accessStats: FrameAccessStats?,
         nowMs: Int64

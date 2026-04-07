@@ -1,12 +1,12 @@
 import Foundation
 
-package enum WALFsyncPolicy: Sendable, Equatable {
+public enum WALFsyncPolicy: Sendable, Equatable {
     case always
     case onCommit
     case everyBytes(UInt64)
 }
 
-package final class WALRingWriter {
+public final class WALRingWriter {
     private struct WriterStateSnapshot {
         let writePos: UInt64
         let checkpointPos: UInt64
@@ -20,23 +20,23 @@ package final class WALRingWriter {
     }
 
     private let file: FDFile
-    package let walOffset: UInt64
-    package let walSize: UInt64
+    public let walOffset: UInt64
+    public let walSize: UInt64
     private let fsyncPolicy: WALFsyncPolicy
     private static let sentinelData = Data(repeating: 0, count: WALRecord.headerSize)
 
-    package private(set) var writePos: UInt64
-    package private(set) var checkpointPos: UInt64
-    package private(set) var pendingBytes: UInt64
-    package private(set) var lastSequence: UInt64
-    package private(set) var wrapCount: UInt64
-    package private(set) var checkpointCount: UInt64
-    package private(set) var sentinelWriteCount: UInt64
-    package private(set) var writeCallCount: UInt64
+    public private(set) var writePos: UInt64
+    public private(set) var checkpointPos: UInt64
+    public private(set) var pendingBytes: UInt64
+    public private(set) var lastSequence: UInt64
+    public private(set) var wrapCount: UInt64
+    public private(set) var checkpointCount: UInt64
+    public private(set) var sentinelWriteCount: UInt64
+    public private(set) var writeCallCount: UInt64
     private var bytesSinceFsync: UInt64
     private var isFaulted = false
 
-    package init(
+    public init(
         file: FDFile,
         walOffset: UInt64,
         walSize: UInt64,
@@ -71,7 +71,7 @@ package final class WALRingWriter {
     }
 
     @discardableResult
-    package func append(payload: Data, flags: WALFlags = []) throws -> UInt64 {
+    public func append(payload: Data, flags: WALFlags = []) throws -> UInt64 {
         guard !isFaulted else {
             throw WaxError.io("WAL writer is faulted after a partial write failure")
         }
@@ -192,7 +192,7 @@ package final class WALRingWriter {
 
     /// Append multiple payloads in a single pass, reusing padding and wrap calculations.
     /// Returns the sequence numbers for the appended data records (padding records are excluded).
-    package func appendBatch(payloads: [Data], flags: WALFlags = []) throws -> [UInt64] {
+    public func appendBatch(payloads: [Data], flags: WALFlags = []) throws -> [UInt64] {
         guard !isFaulted else {
             throw WaxError.io("WAL writer is faulted after a partial write failure")
         }
@@ -326,7 +326,7 @@ package final class WALRingWriter {
         }
     }
 
-    package func canAppend(payloadSize: Int) -> Bool {
+    public func canAppend(payloadSize: Int) -> Bool {
         guard payloadSize > 0 else { return false }
         guard walSize > 0 else { return false }
         guard payloadSize <= Int(UInt32.max) else { return false }
@@ -360,7 +360,7 @@ package final class WALRingWriter {
         return pendingBytes + totalNeeded <= walSize
     }
 
-    package func canAppendBatch(payloadSizes: [Int]) -> Bool {
+    public func canAppendBatch(payloadSizes: [Int]) -> Bool {
         guard !payloadSizes.isEmpty else { return false }
         guard walSize > 0 else { return false }
 
@@ -412,14 +412,14 @@ package final class WALRingWriter {
         return localPendingBytes <= walSize
     }
 
-    package func recordCheckpoint() {
+    public func recordCheckpoint() {
         checkpointPos = writePos
         pendingBytes = 0
         bytesSinceFsync = 0
         checkpointCount &+= 1
     }
 
-    package func flush() throws {
+    public func flush() throws {
         guard bytesSinceFsync > 0 else { return }
         try file.fsync()
         bytesSinceFsync = 0
@@ -500,9 +500,9 @@ package final class WALRingWriter {
         restoreState(snapshot)
         isFaulted = true
         // Best-effort: overwrite any partially-written bytes at the restored writePos
-        // with a zeroed sentinel so a subsequent package does not mistake stale on-disk
+        // with a zeroed sentinel so a subsequent open does not mistake stale on-disk
         // content (e.g., a sentinel written before the failure) for a valid record.
-        // This is advisory — the package path must still handle corrupt content defensively.
+        // This is advisory — the open path must still handle corrupt content defensively.
         try? writeAllCounted(Self.sentinelData, at: walOffset + snapshot.writePos)
     }
 }

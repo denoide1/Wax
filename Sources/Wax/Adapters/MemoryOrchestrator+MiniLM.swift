@@ -2,7 +2,7 @@
 import Foundation
 import WaxVectorSearchMiniLM
 
-package extension MemoryOrchestrator {
+public extension MemoryOrchestrator {
     static func openMiniLM(
         at url: URL,
         config: OrchestratorConfig = .default

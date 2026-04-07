@@ -21,7 +21,7 @@ private enum BufferSerializationError: Error {
 extension USearchIndex {
     /// Returns the expected serialized size in bytes.
     /// This avoids needing to serialize twice to determine buffer size.
-    package var serializedLength: Int {
+    public var serializedLength: Int {
         get throws {
             let nativeIndex = try getNativeIndexHandle()
             var errorPtr: UnsafePointer<CChar>?
@@ -36,7 +36,7 @@ extension USearchIndex {
 
     /// Saves the index directly to an in-memory buffer, avoiding temp file I/O.
     /// - Parameter buffer: Pre-allocated mutable buffer of at least `serializedLength` bytes
-    package func saveToBuffer(_ buffer: UnsafeMutableRawPointer, length: Int) throws {
+    public func saveToBuffer(_ buffer: UnsafeMutableRawPointer, length: Int) throws {
         let nativeIndex = try getNativeIndexHandle()
         var errorPtr: UnsafePointer<CChar>?
         usearch_save_buffer(nativeIndex, buffer, length, &errorPtr)
@@ -48,7 +48,7 @@ extension USearchIndex {
 
     /// Loads the index directly from an in-memory buffer, avoiding temp file I/O.
     /// - Parameter buffer: Buffer containing serialized index data
-    package func loadFromBuffer(_ buffer: UnsafeRawPointer, length: Int) throws {
+    public func loadFromBuffer(_ buffer: UnsafeRawPointer, length: Int) throws {
         let nativeIndex = try getNativeIndexHandle()
         var errorPtr: UnsafePointer<CChar>?
         usearch_load_buffer(nativeIndex, buffer, length, &errorPtr)
@@ -60,7 +60,7 @@ extension USearchIndex {
 
     /// Serializes the index to Data using in-memory buffer operations.
     /// This is ~10-100x faster than file-based serialization.
-    package func serializeToData() throws -> Data {
+    public func serializeToData() throws -> Data {
         let size = try serializedLength
         guard size > 0 else {
             return Data()
@@ -77,7 +77,7 @@ extension USearchIndex {
 
     /// Deserializes the index from Data using in-memory buffer operations.
     /// This is ~10-100x faster than file-based deserialization.
-    package func deserializeFromData(_ data: Data) throws {
+    public func deserializeFromData(_ data: Data) throws {
         guard !data.isEmpty else { return }
         try data.withUnsafeBytes { buffer in
             guard let baseAddress = buffer.baseAddress else {
@@ -114,7 +114,7 @@ extension USearchIndex {
 // instead of the in-memory buffer path. Performance is lower but correctness
 // is preserved on all platforms.
 extension USearchIndex {
-    package func serializeToData() throws -> Data {
+    public func serializeToData() throws -> Data {
         let tmpPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).usearch").path
         defer { try? FileManager.default.removeItem(atPath: tmpPath) }
@@ -125,7 +125,7 @@ extension USearchIndex {
         return data
     }
 
-    package func deserializeFromData(_ data: Data) throws {
+    public func deserializeFromData(_ data: Data) throws {
         guard !data.isEmpty else { return }
         let tmpPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(UUID().uuidString).usearch").path

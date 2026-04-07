@@ -1,27 +1,27 @@
 import Foundation
 
 /// Access statistics for a single frame.
-package struct FrameAccessStats: Sendable, Equatable, Codable {
+public struct FrameAccessStats: Sendable, Equatable, Codable {
     /// Frame ID
-    package var frameId: UInt64
+    public var frameId: UInt64
     
     /// Total access count
-    package var accessCount: UInt32
+    public var accessCount: UInt32
     
     /// Last access timestamp (milliseconds since epoch)
-    package var lastAccessMs: Int64
+    public var lastAccessMs: Int64
     
     /// First access timestamp (milliseconds since epoch)
-    package var firstAccessMs: Int64
+    public var firstAccessMs: Int64
     
-    package init(frameId: UInt64, nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
+    public init(frameId: UInt64, nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         self.frameId = frameId
         self.accessCount = 1
         self.lastAccessMs = nowMs
         self.firstAccessMs = nowMs
     }
     
-    package mutating func recordAccess(nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
+    public mutating func recordAccess(nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) {
         // Use saturating addition to prevent overflow
         accessCount = accessCount.addingReportingOverflow(1).partialValue
         lastAccessMs = nowMs
@@ -29,14 +29,14 @@ package struct FrameAccessStats: Sendable, Equatable, Codable {
 }
 
 /// Manages access statistics for frame retrieval tracking.
-package actor AccessStatsManager {
+public actor AccessStatsManager {
     private var stats: [UInt64: FrameAccessStats] = [:]
     private var dirty = false
     
-    package init() {}
+    public init() {}
     
     /// Record a single frame access.
-    package func recordAccess(frameId: UInt64) {
+    public func recordAccess(frameId: UInt64) {
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         if var existing = stats[frameId] {
             existing.recordAccess(nowMs: nowMs)
@@ -48,7 +48,7 @@ package actor AccessStatsManager {
     }
     
     /// Record accesses for multiple frames at once.
-    package func recordAccesses(frameIds: [UInt64]) {
+    public func recordAccesses(frameIds: [UInt64]) {
         guard !frameIds.isEmpty else { return }
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
         for frameId in frameIds {
@@ -63,12 +63,12 @@ package actor AccessStatsManager {
     }
     
     /// Get stats for a single frame.
-    package func getStats(frameId: UInt64) -> FrameAccessStats? {
+    public func getStats(frameId: UInt64) -> FrameAccessStats? {
         stats[frameId]
     }
     
     /// Get stats for multiple frames.
-    package func getStats(frameIds: [UInt64]) -> [UInt64: FrameAccessStats] {
+    public func getStats(frameIds: [UInt64]) -> [UInt64: FrameAccessStats] {
         var result: [UInt64: FrameAccessStats] = [:]
         result.reserveCapacity(frameIds.count)
         for frameId in frameIds {
@@ -80,7 +80,7 @@ package actor AccessStatsManager {
     }
     
     /// Remove stats for frames that no longer exist.
-    package func pruneStats(keepingOnly activeFrameIds: Set<UInt64>) {
+    public func pruneStats(keepingOnly activeFrameIds: Set<UInt64>) {
         let before = stats.count
         stats = stats.filter { activeFrameIds.contains($0.key) }
         if stats.count != before {
@@ -89,29 +89,29 @@ package actor AccessStatsManager {
     }
     
     /// Export all stats for persistence.
-    package func exportStats() -> [FrameAccessStats] {
+    public func exportStats() -> [FrameAccessStats] {
         Array(stats.values).sorted { $0.frameId < $1.frameId }
     }
 
     /// Export all stats only when they have changed since the last persist.
-    package func exportStatsIfDirty() -> [FrameAccessStats]? {
+    public func exportStatsIfDirty() -> [FrameAccessStats]? {
         guard dirty else { return nil }
         return exportStats()
     }
 
     /// Mark the current in-memory snapshot as persisted.
-    package func markPersisted() {
+    public func markPersisted() {
         dirty = false
     }
     
     /// Import stats from persistence.
-    package func importStats(_ imported: [FrameAccessStats]) {
+    public func importStats(_ imported: [FrameAccessStats]) {
         stats = Dictionary(uniqueKeysWithValues: imported.map { ($0.frameId, $0) })
         dirty = false
     }
     
     /// Total number of tracked frames.
-    package var count: Int {
+    public var count: Int {
         stats.count
     }
 }

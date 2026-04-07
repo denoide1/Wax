@@ -1,6 +1,6 @@
-#if canImport(WaxBertTokenizer)
+#if canImport(WaxVectorSearchMiniLM)
 import Testing
-@testable import WaxBertTokenizer
+@testable import WaxVectorSearchMiniLM
 
 @Test
 func bertTokenizerBuildBatchInputsReusesBuffers() throws {
@@ -32,21 +32,5 @@ func bertTokenizerVocabLoadsOnceAcrossInstances() throws {
     _ = try BertTokenizer()
 
     #expect(BertTokenizer._vocabLoadCountForTests() == 1)
-}
-
-@Test
-func sharedTokenizerProducesSameTokensForBothTargets() throws {
-    // Verify the shared WaxBertTokenizer produces valid tokens
-    let tokenizer = try BertTokenizer()
-    let tokens = tokenizer.tokenize(text: "Hello world, this is a test.")
-    #expect(!tokens.isEmpty)
-    #expect(tokens.contains("hello"))
-    #expect(tokens.contains("world"))
-
-    // Verify token IDs roundtrip
-    let ids = try tokenizer.convertTokensToIds(tokens: tokens)
-    #expect(ids.count == tokens.count)
-    let recovered = try tokenizer.idsToTokens(tokenIds: ids)
-    #expect(recovered == tokens)
 }
 #endif

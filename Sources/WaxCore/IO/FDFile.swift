@@ -67,7 +67,7 @@ struct FDFileFaultPlan: Sendable, Equatable {
 }
 
 /// POSIX file descriptor-backed file with offset-based I/O.
-package final class FDFile {
+public final class FDFile {
     private enum ReadDirective {
         case none
         case fail(errno: Int32)
@@ -137,8 +137,7 @@ package final class FDFile {
 
     private let fd: Int32
     private let url: URL
-    package private(set) var isClosed = false
-    private let closeLock = NSLock()
+    private var isClosed = false
     private var faultInjectionState: FaultInjectionState?
 
     private init(fd: Int32, url: URL) {
@@ -155,19 +154,19 @@ package final class FDFile {
     // MARK: - Factory
 
     /// Create a new file (truncates if exists).
-    package static func create(at url: URL) throws -> FDFile {
+    public static func create(at url: URL) throws -> FDFile {
         let fd = try openFile(at: url, flags: O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, mode: mode_t(0o644))
         return FDFile(fd: fd, url: url)
     }
 
     /// Open an existing file for read/write.
-    package static func open(at url: URL) throws -> FDFile {
+    public static func open(at url: URL) throws -> FDFile {
         let fd = try openFile(at: url, flags: O_RDWR | O_CLOEXEC, mode: nil)
         return FDFile(fd: fd, url: url)
     }
 
     /// Open an existing file for read-only access.
-    package static func openReadOnly(at url: URL) throws -> FDFile {
+    public static func openReadOnly(at url: URL) throws -> FDFile {
         let fd = try openFile(at: url, flags: O_RDONLY | O_CLOEXEC, mode: nil)
         return FDFile(fd: fd, url: url)
     }
@@ -183,7 +182,7 @@ package final class FDFile {
     // MARK: - Read/Write
 
     /// May short read at EOF.
-    package func read(length: Int, at offset: UInt64) throws -> Data {
+    public func read(length: Int, at offset: UInt64) throws -> Data {
         try ensureOpen()
         guard length >= 0 else {
             throw WaxError.io("Invalid read length: \(length)")
@@ -208,7 +207,7 @@ package final class FDFile {
     }
 
     /// Must return exactly `length` bytes or throw.
-    package func readExactly(length: Int, at offset: UInt64) throws -> Data {
+    public func readExactly(length: Int, at offset: UInt64) throws -> Data {
         try ensureOpen()
         guard length >= 0 else {
             throw WaxError.io("Invalid read length: \(length)")
@@ -244,7 +243,7 @@ package final class FDFile {
     }
 
     /// Must write all bytes or throw.
-    package func writeAll(_ data: Data, at offset: UInt64) throws {
+    public func writeAll(_ data: Data, at offset: UInt64) throws {
         try ensureOpen()
         if data.isEmpty { return }
 
@@ -276,7 +275,7 @@ package final class FDFile {
 
     // MARK: - Durability
 
-    package func fsync() throws {
+    public func fsync() throws {
         try ensureOpen()
         #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
         if fcntl(fd, F_FULLFSYNC, 0) == 0 { return }
@@ -288,7 +287,7 @@ package final class FDFile {
 
     // MARK: - Size / Lifecycle
 
-    package func size() throws -> UInt64 {
+    public func size() throws -> UInt64 {
         try ensureOpen()
         var info = stat()
         guard fstat(fd, &info) == 0 else {
@@ -297,7 +296,7 @@ package final class FDFile {
         return UInt64(info.st_size)
     }
 
-    package func truncate(to size: UInt64) throws {
+    public func truncate(to size: UInt64) throws {
         try ensureOpen()
         guard size <= UInt64(Int64.max) else {
             throw WaxError.io("Invalid truncate size: \(size)")
@@ -308,7 +307,7 @@ package final class FDFile {
     }
 
     /// Ensure the file is at least the requested size, extending with zeros if needed.
-    package func ensureSize(atLeast size: UInt64) throws {
+    public func ensureSize(atLeast size: UInt64) throws {
         let current = try self.size()
         if current < size {
             try truncate(to: size)
@@ -317,7 +316,7 @@ package final class FDFile {
 
     /// Map a writable region of the file at the given offset and length.
     /// The returned region must be closed to unmap the memory.
-    package func mapWritable(length: Int, at offset: UInt64) throws -> MappedWritableRegion {
+    public func mapWritable(length: Int, at offset: UInt64) throws -> MappedWritableRegion {
         try ensureOpen()
         guard length > 0 else {
             throw WaxError.io("mapWritable length must be > 0")
@@ -357,17 +356,21 @@ package final class FDFile {
         )
     }
 
-    package func close() throws {
-        try closeLock.withLock {
-            if isClosed { return }
-            let result = posixClose(fd)
-            if result == 0 { isClosed = true; return }
-            if errno == EINTR { isClosed = true; return }
-            throw WaxError.io("close failed: \(Self.stringError())")
+    public func close() throws {
+        if isClosed { return }
+        let result = posixClose(fd)
+        if result == 0 {
+            isClosed = true
+            return
         }
+        if errno == EINTR {
+            isClosed = true
+            return
+        }
+        throw WaxError.io("close failed: \(stringError())")
     }
 
-    package var fileDescriptor: Int32 { fd }
+    public var fileDescriptor: Int32 { fd }
 
     // MARK: - Helpers
 
@@ -453,12 +456,11 @@ package final class FDFile {
 extension FDFile: @unchecked Sendable {}
 
 /// RAII wrapper around a writable mmap region.
-package final class MappedWritableRegion: @unchecked Sendable {
+public final class MappedWritableRegion: @unchecked Sendable {
     private let basePointer: UnsafeMutableRawPointer
     private let mappedLength: Int
-    package let buffer: UnsafeMutableRawBufferPointer
+    public let buffer: UnsafeMutableRawBufferPointer
     private var isClosed = false
-    private let closeLock = NSLock()
 
     init(basePointer: UnsafeMutableRawPointer, mappedLength: Int, bufferPointer: UnsafeMutableRawBufferPointer) {
         self.basePointer = basePointer
@@ -466,15 +468,13 @@ package final class MappedWritableRegion: @unchecked Sendable {
         self.buffer = bufferPointer
     }
 
-    package func close() {
-        closeLock.withLock {
-            if isClosed { return }
-            _ = munmap(basePointer, mappedLength)
-            isClosed = true
-        }
+    public func close() {
+        if isClosed { return }
+        _ = munmap(basePointer, mappedLength)
+        isClosed = true
     }
 
-    package func copyBytes(from data: Data) {
+    public func copyBytes(from data: Data) {
         precondition(data.count <= buffer.count, "data length exceeds mapped buffer")
         buffer.copyBytes(from: data)
     }

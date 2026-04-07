@@ -3,8 +3,8 @@ import WaxCore
 import WaxTextSearch
 import WaxVectorSearch
 
-package struct FastRAGContextBuilder: Sendable {
-    package init() {}
+public struct FastRAGContextBuilder: Sendable {
+    public init() {}
 
     /// Build a deterministic RAG context: at most one expansion + ranked snippets.
     /// - Parameters:
@@ -12,14 +12,13 @@ package struct FastRAGContextBuilder: Sendable {
     ///   - embedding: optional caller-supplied embedding (no query-time embedding inside Wax)
     ///   - wax: Wax handle
     ///   - config: Fast RAG configuration
-    package func build(
+    public func build(
         query: String,
         embedding: [Float]? = nil,
         vectorEnginePreference: VectorEnginePreference = .auto,
         wax: Wax,
         session: WaxSession? = nil,
         frameFilter: FrameFilter? = nil,
-        timeRange: SearchTimeRange? = nil,
         accessStatsManager: AccessStatsManager? = nil,
         config: FastRAGConfig = .init()
     ) async throws -> RAGContext {
@@ -33,7 +32,6 @@ package struct FastRAGContextBuilder: Sendable {
             vectorEnginePreference: vectorEnginePreference,
             mode: clamped.searchMode,
             topK: clamped.searchTopK,
-            timeRange: timeRange,
             frameFilter: frameFilter,
             rrfK: clamped.rrfK,
             previewMaxBytes: clamped.previewMaxBytes
@@ -53,7 +51,7 @@ package struct FastRAGContextBuilder: Sendable {
             )
             : response.results
         let accessStatsMap: [UInt64: FrameAccessStats] = if let accessStatsManager {
-            await accessStatsManager.getStats(frameIds: rankedResults.map { $0.frameId })
+            await accessStatsManager.getStats(frameIds: rankedResults.map(\.frameId))
         } else {
             [:]
         }
@@ -75,7 +73,7 @@ package struct FastRAGContextBuilder: Sendable {
             && clamped.maxSurrogates > 0
             && clamped.surrogateMaxTokens > 0
             && clamped.maxContextTokens > 0
-        let sourceFrameIds = rankedResults.map { $0.frameId }
+        let sourceFrameIds = rankedResults.map(\.frameId)
         async let surrogateMapTask: [UInt64: UInt64] = shouldPrefetchSurrogates
             ? wax.surrogateFrameIds(for: sourceFrameIds)
             : [:]
@@ -101,9 +99,8 @@ package struct FastRAGContextBuilder: Sendable {
                             kind: .expanded,
                             frameId: result.frameId,
                             score: result.score,
-                            sources: RAGContext.Source.fromSearchSources(result.sources),
-                            text: expanded,
-                            metadata: result.metadata
+                            sources: result.sources,
+                            text: expanded
                         )
                     )
                     break
@@ -241,9 +238,8 @@ package struct FastRAGContextBuilder: Sendable {
                             kind: .surrogate,
                             frameId: surrogateFrameId,
                             score: result.score,
-                            sources: RAGContext.Source.fromSearchSources(result.sources),
-                            text: capped,
-                            metadata: result.metadata
+                            sources: result.sources,
+                            text: capped
                         )
                     )
                     surrogateSourceFrameIds.insert(result.frameId)
@@ -329,9 +325,8 @@ package struct FastRAGContextBuilder: Sendable {
                             kind: .snippet,
                             frameId: result.frameId,
                             score: result.score,
-                            sources: RAGContext.Source.fromSearchSources(result.sources),
-                            text: capped,
-                            metadata: result.metadata
+                            sources: result.sources,
+                            text: capped
                         )
                     )
                     remainingTokens -= tokens

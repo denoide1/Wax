@@ -1,35 +1,35 @@
 import Foundation
 
-package struct TagPair: Equatable, Sendable {
-    package var key: String
-    package var value: String
+public struct TagPair: Equatable, Sendable {
+    public var key: String
+    public var value: String
 
-    package init(key: String, value: String) {
+    public init(key: String, value: String) {
         self.key = key
         self.value = value
     }
 }
 
-package struct FrameMetaSubset: Equatable, Sendable {
-    package var uri: String?
-    package var title: String?
-    package var kind: String?
-    package var track: String?
-    package var tags: [TagPair]
-    package var labels: [String]
-    package var contentDates: [String]
-    package var role: FrameRole?
-    package var parentId: UInt64?
-    package var chunkIndex: UInt32?
-    package var chunkCount: UInt32?
-    package var chunkManifest: Data?
-    package var status: FrameStatus?
-    package var supersedes: UInt64?
-    package var supersededBy: UInt64?
-    package var searchText: String?
-    package var metadata: Metadata?
+public struct FrameMetaSubset: Equatable, Sendable {
+    public var uri: String?
+    public var title: String?
+    public var kind: String?
+    public var track: String?
+    public var tags: [TagPair]
+    public var labels: [String]
+    public var contentDates: [String]
+    public var role: FrameRole?
+    public var parentId: UInt64?
+    public var chunkIndex: UInt32?
+    public var chunkCount: UInt32?
+    public var chunkManifest: Data?
+    public var status: FrameStatus?
+    public var supersedes: UInt64?
+    public var supersededBy: UInt64?
+    public var searchText: String?
+    public var metadata: Metadata?
 
-    package init(
+    public init(
         uri: String? = nil,
         title: String? = nil,
         kind: String? = nil,
@@ -69,7 +69,7 @@ package struct FrameMetaSubset: Equatable, Sendable {
 }
 
 extension FrameMetaSubset: BinaryEncodable {
-    package mutating func encode(to encoder: inout BinaryEncoder) throws {
+    public mutating func encode(to encoder: inout BinaryEncoder) throws {
         try encoder.encode(uri)
         try encoder.encode(title)
         try encoder.encode(kind)
@@ -99,7 +99,7 @@ extension FrameMetaSubset: BinaryEncodable {
 }
 
 extension FrameMetaSubset: BinaryDecodable {
-    package static func decode(from decoder: inout BinaryDecoder) throws -> FrameMetaSubset {
+    public static func decode(from decoder: inout BinaryDecoder) throws -> FrameMetaSubset {
         let uri = try decoder.decodeOptional(String.self)
         let title = try decoder.decodeOptional(String.self)
         let kind = try decoder.decodeOptional(String.self)

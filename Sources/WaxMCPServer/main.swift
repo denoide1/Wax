@@ -10,10 +10,6 @@ import Wax
 import WaxVectorSearchMiniLM
 #endif
 
-#if ArcticEmbeddings && canImport(WaxVectorSearchArctic) && canImport(CoreML)
-import WaxVectorSearchArctic
-#endif
-
 @available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
 struct WaxMCPServerCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -27,10 +23,7 @@ struct WaxMCPServerCommand: ParsableCommand {
     @Option(name: .customLong("license-key"), help: "Wax license key (fallback: WAX_LICENSE_KEY)")
     var licenseKey: String?
 
-    @Option(name: .customLong("embedder"), help: "Embedding provider: minilm (default) or arctic")
-    var embedderChoice: String = "minilm"
-
-    @Flag(name: .customLong("no-embedder"), help: "Run in text-only mode without any embedder")
+    @Flag(name: .customLong("no-embedder"), help: "Run in text-only mode without MiniLM")
     var noEmbedder = false
 
     mutating func run() throws {
@@ -59,13 +52,9 @@ struct WaxMCPServerCommand: ParsableCommand {
             try LicenseValidator.validate(key: resolvedLicense)
         }
 
-        let memoryURL = try MCPPathing.resolveStoreURL(storePath)
-        try StoreLockProbe.preflightExclusiveAccess(at: memoryURL, timeout: lockWaitTimeout())
+        let memoryURL = try resolveStoreURL(storePath)
 
-        let embedder = try await MCPMemoryFactory.buildEmbedder(
-            noEmbedder: noEmbedder,
-            embedderChoice: embedderChoice
-        )
+        let embedder = try await buildEmbedder()
 
         var memoryConfig = OrchestratorConfig.default
         memoryConfig.enableStructuredMemory = featureFlagEnabled(
@@ -84,13 +73,7 @@ struct WaxMCPServerCommand: ParsableCommand {
         let activeToolNames = ToolSchemas.tools(structuredMemoryEnabled: memoryConfig.enableStructuredMemory)
             .map(\.name)
 
-        let embedderStatus: String = {
-            guard memoryConfig.enableVectorSearch else { return "text-only" }
-            if let identity = embedder?.identity?.model {
-                return identity
-            }
-            return embedderChoice.lowercased()
-        }()
+        let embedderStatus = memoryConfig.enableVectorSearch ? "miniLM" : "text-only"
         writeStderr(
             "wax-mcp config: store=\"\(memoryURL.path)\" " +
                 "structuredMemory=\(memoryConfig.enableStructuredMemory) " +
@@ -104,12 +87,11 @@ struct WaxMCPServerCommand: ParsableCommand {
         let memory = try await MemoryOrchestrator(
             at: memoryURL,
             config: memoryConfig,
-            embedder: embedder,
-            waxOptions: waxOptions()
+            embedder: embedder
         )
 
-        // SYNC: keep this version in sync with Resources/npm/waxmcp/package.json "version"
-        let serverVersion = "0.1.19"
+        // SYNC: keep this version in sync with npm/waxmcp/package.json "version"
+        let serverVersion = "0.1.12"
         writeStderr("wax-mcp v\(serverVersion) starting")
         let server = Server(
             name: "wax-mcp",
@@ -121,9 +103,7 @@ struct WaxMCPServerCommand: ParsableCommand {
         await WaxMCPTools.register(
             on: server,
             memory: memory,
-            structuredMemoryEnabled: memoryConfig.enableStructuredMemory,
-            noEmbedder: noEmbedder,
-            embedderChoice: embedderChoice
+            structuredMemoryEnabled: memoryConfig.enableStructuredMemory
         )
 
         // Install signal handlers so SIGINT/SIGTERM trigger graceful shutdown
@@ -132,7 +112,7 @@ struct WaxMCPServerCommand: ParsableCommand {
 
         var runError: Error?
         do {
-            let transport = GracefulStdioTransport()
+            let transport = StdioTransport()
             try await server.start(transport: transport)
             await server.waitUntilCompleted()
         } catch {
@@ -198,26 +178,35 @@ struct WaxMCPServerCommand: ParsableCommand {
         }
     }
 
-    private func waxOptions() -> WaxOptions {
-        var options = WaxOptions()
-        options.lockWaitTimeout = lockWaitTimeout()
-        return options
+    private func resolveStoreURL(_ rawPath: String) throws -> URL {
+        let expanded = (rawPath as NSString).expandingTildeInPath
+        let trimmed = expanded.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw MCP.MCPError.invalidParams("Store path cannot be empty")
+        }
+
+        let url = URL(fileURLWithPath: trimmed).standardizedFileURL
+        let dir = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        return url
     }
 
-    private func lockWaitTimeout() -> Duration? {
-        let env = ProcessInfo.processInfo.environment
-        guard let raw = env["WAX_LOCK_TIMEOUT_SECS"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty
-        else {
-            return .seconds(10)
+    private func buildEmbedder() async throws -> (any EmbeddingProvider)? {
+        if noEmbedder {
+            return nil
         }
-        guard let secs = Double(raw) else {
-            return .seconds(10)
-        }
-        guard secs > 0 else { return nil }
-        return .milliseconds(Int64(secs * 1000))
-    }
 
+        #if MiniLMEmbeddings && canImport(WaxVectorSearchMiniLM) && canImport(CoreML)
+        do {
+            return try await MiniLMEmbedder.makeCommandLineEmbedder(prewarmBatchSize: 1)
+        } catch {
+            writeStderr("Warning: MiniLM embedder failed to load (\(error)); falling back to text-only search.")
+            return nil
+        }
+        #else
+        return nil
+        #endif
+    }
 }
 
 private func installSignalHandlers(server: Server) -> [DispatchSourceSignal] {
@@ -235,7 +224,7 @@ private func installSignalHandlers(server: Server) -> [DispatchSourceSignal] {
     return sources
 }
 
-func writeStderr(_ message: String) {
+private func writeStderr(_ message: String) {
     guard let data = (message + "\n").data(using: .utf8) else { return }
     FileHandle.standardError.write(data)
 }

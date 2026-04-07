@@ -53,15 +53,10 @@ import Glibc
             }
         }
 
-        let runningAsRoot = geteuid() == 0
-
         do {
-            let lock = try FileLock.acquire(at: url, mode: .exclusive)
-            try lock.release()
-            // Root in containerized Linux can bypass mode bits and still acquire.
-            #expect(runningAsRoot)
+            _ = try FileLock.acquire(at: url, mode: .exclusive)
+            #expect(Bool(false))
         } catch let error as WaxError {
-            #expect(!runningAsRoot)
             guard case .io = error else {
                 #expect(Bool(false))
                 return
@@ -138,29 +133,5 @@ import Glibc
         let newLock = try FileLock.tryAcquire(at: url, mode: .exclusive)
         #expect(newLock != nil)
         try newLock?.release()
-    }
-}
-
-@Test func exclusiveLockTimesOutWhenAlreadyLocked() throws {
-    try TempFiles.withTempFile { url in
-        FileManager.default.createFile(atPath: url.path, contents: nil)
-
-        let holder = try FileLock.acquire(at: url, mode: .exclusive)
-        defer { try? holder.release() }
-
-        let clock = ContinuousClock()
-        let start = clock.now
-        do {
-            _ = try FileLock.acquire(at: url, mode: .exclusive, timeout: .milliseconds(150))
-            Issue.record("expected timed lock acquisition to throw")
-        } catch let error as WaxError {
-            let elapsed = start.duration(to: clock.now)
-            guard case .lockUnavailable(let details) = error else {
-                Issue.record("expected lockUnavailable, got \(error)")
-                return
-            }
-            #expect(details.contains("timed out waiting for exclusive lock"))
-            #expect(elapsed < .seconds(2))
-        }
     }
 }

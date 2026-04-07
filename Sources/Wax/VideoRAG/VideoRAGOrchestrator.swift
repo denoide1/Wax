@@ -20,7 +20,7 @@ import AVFoundation
 /// `VideoRAGOrchestrator` ingests local videos (file URLs and optionally Photos videos offline-only),
 /// computes segment keyframe embeddings, optionally indexes host-supplied transcripts, and serves
 /// hybrid retrieval to assemble prompt-ready context.
-package actor VideoRAGOrchestrator {
+public actor VideoRAGOrchestrator {
     private static let photosVideoRequestTimeout: Duration = .seconds(10)
     private static let scoreTieEpsilon: Float = 1e-3
 
@@ -85,11 +85,11 @@ package actor VideoRAGOrchestrator {
     }
 
     /// The underlying Wax store for frame storage and indexing.
-    package let wax: Wax
+    public let wax: Wax
     /// The active Wax session for reads and writes.
-    package let session: WaxSession
+    public let session: WaxSession
     /// Configuration controlling segment duration, pixel sizes, transcript budgets, and search parameters.
-    package let config: VideoRAGConfig
+    public let config: VideoRAGConfig
 
     private let embedder: any MultimodalEmbeddingProvider
     private let transcriptProvider: (any VideoTranscriptProvider)?
@@ -97,7 +97,7 @@ package actor VideoRAGOrchestrator {
 
     private var index = IndexState()
 
-    package init(
+    public init(
         storeURL: URL,
         config: VideoRAGConfig = .default,
         embedder: any MultimodalEmbeddingProvider,
@@ -144,7 +144,7 @@ package actor VideoRAGOrchestrator {
 
     #if canImport(Photos)
     /// Scope for syncing videos from the Photos library.
-    package enum VideoScope: Sendable, Equatable {
+    public enum VideoScope: Sendable, Equatable {
         case fullLibrary
         case assetIDs([String])
     }
@@ -152,7 +152,7 @@ package actor VideoRAGOrchestrator {
     /// Sync the Photos library videos into the local Wax store.
     ///
     /// Offline-only: iCloud-only assets are indexed as metadata-only and marked degraded.
-    package func syncLibrary(scope: VideoScope) async throws {
+    public func syncLibrary(scope: VideoScope) async throws {
         let ids: [String] = switch scope {
         case .assetIDs(let ids):
             ids
@@ -175,7 +175,7 @@ package actor VideoRAGOrchestrator {
     #endif
 
     /// Ingest local file videos.
-    package func ingest(files: [VideoFile]) async throws {
+    public func ingest(files: [VideoFile]) async throws {
         let unique = Self.dedupeFiles(files)
         guard !unique.isEmpty else { return }
 
@@ -204,7 +204,7 @@ package actor VideoRAGOrchestrator {
 
     // MARK: - Recall
 
-    package func recall(_ query: VideoQuery) async throws -> VideoRAGContext {
+    public func recall(_ query: VideoQuery) async throws -> VideoRAGContext {
         let cleanedText = query.text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let queryText = (cleanedText?.isEmpty == false) ? cleanedText : nil
 
@@ -510,7 +510,7 @@ package actor VideoRAGOrchestrator {
 
     // MARK: - Delete / flush
 
-    package func delete(videoID: VideoID) async throws {
+    public func delete(videoID: VideoID) async throws {
         guard let rootId = index.rootByVideoID[videoID] else { return }
 
         var toDelete: [UInt64] = [rootId]
@@ -525,7 +525,7 @@ package actor VideoRAGOrchestrator {
         try await rebuildIndex()
     }
 
-    package func flush() async throws {
+    public func flush() async throws {
         try await session.commit()
     }
 
@@ -1075,7 +1075,7 @@ package actor VideoRAGOrchestrator {
         return unique
     }
 
-    private static func toWaxTimeRange(_ range: ClosedRange<Date>?) -> SearchTimeRange? {
+    private static func toWaxTimeRange(_ range: ClosedRange<Date>?) -> TimeRange? {
         guard let range else { return nil }
         let after = Int64(range.lowerBound.timeIntervalSince1970 * 1000)
         let beforeInclusive = Int64(range.upperBound.timeIntervalSince1970 * 1000)
@@ -1088,7 +1088,7 @@ package actor VideoRAGOrchestrator {
         } else {
             beforeExclusive = beforeInclusive + 1
         }
-        return SearchTimeRange(after: after, before: beforeExclusive)
+        return TimeRange(after: after, before: beforeExclusive)
     }
 
     private static func makeSegments(

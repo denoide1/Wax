@@ -15,7 +15,7 @@ import Foundation
 import Metal
 import WaxCore
 
-package actor MetalVectorEngine {
+public actor MetalVectorEngine {
     private static let maxResults = 10_000
     private static let initialReserve: UInt32 = 64
     private static let maxThreadsPerThreadgroup = 256
@@ -47,7 +47,7 @@ package actor MetalVectorEngine {
     }
 
     private let metric: VectorMetric
-    package let dimensions: Int
+    public let dimensions: Int
 
     private var vectorCount: UInt64
     private var reservedCapacity: UInt32
@@ -142,7 +142,7 @@ package actor MetalVectorEngine {
     private var transientAllocations: Int = 0
     private var transientReuseCount: Int = 0
     
-    package static var isAvailable: Bool {
+    public static var isAvailable: Bool {
         MTLCreateSystemDefaultDevice() != nil
     }
 
@@ -151,7 +151,7 @@ package actor MetalVectorEngine {
     ///   - metric: Vector similarity metric (only cosine is supported initially)
     ///   - dimensions: Vector dimensionality
     /// - Throws: WaxError if Metal initialization fails or dimensions are invalid
-    package init(metric: VectorMetric, dimensions: Int) throws {
+    public init(metric: VectorMetric, dimensions: Int) throws {
         guard dimensions > 0 else {
             throw WaxError.invalidToc(reason: "dimensions must be > 0")
         }
@@ -316,7 +316,7 @@ package actor MetalVectorEngine {
     }
 
     /// Load engine from Wax persistence layer.
-    package static func load(from wax: Wax, metric: VectorMetric, dimensions: Int) async throws -> MetalVectorEngine {
+    public static func load(from wax: Wax, metric: VectorMetric, dimensions: Int) async throws -> MetalVectorEngine {
         let engine = try MetalVectorEngine(metric: metric, dimensions: dimensions)
         if let bytes = try await wax.readCommittedVecIndexBytes() {
             try await engine.deserialize(bytes)
@@ -328,7 +328,7 @@ package actor MetalVectorEngine {
         return engine
     }
 
-    package func add(frameId: UInt64, vector: [Float]) async throws {
+    public func add(frameId: UInt64, vector: [Float]) async throws {
         try await withWriteLock {
             try validate(vector)
 
@@ -357,7 +357,7 @@ package actor MetalVectorEngine {
         }
     }
 
-    package func addBatch(frameIds: [UInt64], vectors: [[Float]]) async throws {
+    public func addBatch(frameIds: [UInt64], vectors: [[Float]]) async throws {
         guard !frameIds.isEmpty else { return }
         guard frameIds.count == vectors.count else {
             throw WaxError.encodingError(reason: "addBatch: frameIds.count != vectors.count")
@@ -402,7 +402,7 @@ package actor MetalVectorEngine {
         }
     }
 
-    package func addBatchStreaming(frameIds: [UInt64], vectors: [[Float]], chunkSize: Int = 256) async throws {
+    public func addBatchStreaming(frameIds: [UInt64], vectors: [[Float]], chunkSize: Int = 256) async throws {
         guard !frameIds.isEmpty else { return }
         guard frameIds.count == vectors.count else {
             throw WaxError.encodingError(reason: "addBatchStreaming: frameIds.count != vectors.count")
@@ -421,7 +421,7 @@ package actor MetalVectorEngine {
         }
     }
 
-    package func remove(frameId: UInt64) async throws {
+    public func remove(frameId: UInt64) async throws {
         await withWriteLock {
             guard vectorCount > 0 else { return }
             guard let index = frameIds.firstIndex(of: frameId) else { return }
@@ -444,7 +444,7 @@ package actor MetalVectorEngine {
         }
     }
 
-    package func search(vector: [Float], topK: Int) async throws -> [(frameId: UInt64, score: Float)] {
+    public func search(vector: [Float], topK: Int) async throws -> [(frameId: UInt64, score: Float)] {
         try await withReadLock {
             guard vectorCount > 0 else { return [] }
             try validate(vector)
@@ -680,7 +680,7 @@ package actor MetalVectorEngine {
         return heap.map { ($0.1, $0.0) }
     }
 
-    package func serialize() async throws -> Data {
+    public func serialize() async throws -> Data {
         await withReadLock {
             var data = Data()
 
@@ -714,7 +714,7 @@ package actor MetalVectorEngine {
         }
     }
 
-    package func deserialize(_ data: Data) async throws {
+    public func deserialize(_ data: Data) async throws {
         try await withWriteLock {
             guard data.count >= 36 else {
                 throw WaxError.invalidToc(reason: "Metal segment too small: \(data.count) bytes")
@@ -787,11 +787,9 @@ package actor MetalVectorEngine {
                 throw WaxError.invalidToc(reason: "Metal segment missing frameId length")
             }
             
-            // Resize buffer for deserialized vectors.
-            // Keep vectorCount = 0 during resize so resizeBuffersIfNeeded() does NOT
-            // try to copy from the old (undersized) buffer — there are no existing
-            // vectors to preserve during deserialization.
-            reservedCapacity = max(reservedCapacity, UInt32(min(savedVectorCount, UInt64(UInt32.max))))
+            // Resize buffer and copy vectors directly
+            vectorCount = savedVectorCount
+            reservedCapacity = max(reservedCapacity, UInt32(min(vectorCount, UInt64(UInt32.max))))
             try resizeBuffersIfNeeded(for: reservedCapacity)
             
             let destPtr = vectorsBuffer.contents()
@@ -801,9 +799,6 @@ package actor MetalVectorEngine {
                  }
             }
             offset += Int(vectorLength)
-
-            // Set vectorCount AFTER data is copied into the resized buffer.
-            vectorCount = savedVectorCount
 
             let frameIdLength = UInt64(littleEndian: data.withUnsafeBytes {
                 $0.loadUnaligned(fromByteOffset: offset, as: UInt64.self)
@@ -821,7 +816,7 @@ package actor MetalVectorEngine {
     }
 
     /// Stage current state for commit to Wax.
-    package func stageForCommit(into wax: Wax) async throws {
+    public func stageForCommit(into wax: Wax) async throws {
         if !dirty { return }
         let blob = try await serialize()
         try await wax.stageVecIndexForNextCommit(

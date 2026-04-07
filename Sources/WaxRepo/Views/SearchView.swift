@@ -15,19 +15,16 @@ import SwiftTUI
 ///  │    ...             │  ...               │
 ///  └─────────────────────────────────────────┘
 /// ```
-struct SearchView: @MainActor View {
+struct SearchView: View {
     @ObservedObject var viewModel: SearchViewModel
 
-    @MainActor
     var body: some View {
         VStack {
             HeaderView(
                 query: viewModel.query,
                 isSearching: viewModel.isSearching,
                 onSearch: { query in
-                    Task { @MainActor in
-                        viewModel.performSearch(query)
-                    }
+                    viewModel.performSearch(query)
                 }
             )
             HStack {
@@ -36,9 +33,7 @@ struct SearchView: @MainActor View {
                     selectedIndex: viewModel.selectedIndex,
                     searchTime: viewModel.searchTime,
                     onSelect: { index in
-                        Task { @MainActor in
-                            viewModel.selectResult(at: index)
-                        }
+                        viewModel.selectResult(at: index)
                     }
                 )
                 Divider()

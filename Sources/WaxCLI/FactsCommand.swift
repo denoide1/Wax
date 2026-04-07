@@ -19,9 +19,6 @@ struct FactAssertCommand: AsyncParsableCommand {
     @Option(name: .customLong("object"), help: "Object value (parsed as int64, then bool, then string)")
     var objectRaw: String
 
-    @Option(name: .customLong("relation"), help: "Version relation: sets, updates, extends, retracts")
-    var relation: String = "sets"
-
     @Flag(name: .customLong("commit"), inversion: .prefixedNo, help: "Commit immediately (default: true)")
     var commit: Bool = true
 
@@ -38,32 +35,31 @@ struct FactAssertCommand: AsyncParsableCommand {
         guard !trimmedObject.isEmpty else {
             throw CLIError("--object must not be empty")
         }
-        let parsedRelation = try parseVersionRelation(relation)
 
         let object = parseObjectValue(trimmedObject)
 
         let url = try StoreSession.resolveURL(store.storePath)
-        try await StoreSession.withOpen(at: url, noEmbedder: true) { memory in
-            let factID = try await memory.assertFact(
-                subject: EntityKey(trimmedSubject),
-                predicate: PredicateKey(trimmedPredicate),
-                object: object,
-                relation: parsedRelation,
-                validFromMs: nil,
-                validToMs: nil,
-                commit: commit
-            )
+        let memory = try await StoreSession.open(at: url, noEmbedder: true)
+        defer { Task { try? await memory.close() } }
 
-            switch store.format {
-            case .json:
-                printJSON([
-                    "status": "ok",
-                    "fact_id": factID.rawValue,
-                    "committed": commit,
-                ])
-            case .text:
-                print("Fact asserted (id \(factID.rawValue), committed: \(commit)).")
-            }
+        let factID = try await memory.assertFact(
+            subject: EntityKey(trimmedSubject),
+            predicate: PredicateKey(trimmedPredicate),
+            object: object,
+            validFromMs: nil,
+            validToMs: nil,
+            commit: commit
+        )
+
+        switch store.format {
+        case .json:
+            printJSON([
+                "status": "ok",
+                "fact_id": factID.rawValue,
+                "committed": commit,
+            ])
+        case .text:
+            print("Fact asserted (id \(factID.rawValue), committed: \(commit)).")
         }
     }
 }
@@ -84,23 +80,24 @@ struct FactRetractCommand: AsyncParsableCommand {
 
     func runAsync() async throws {
         let url = try StoreSession.resolveURL(store.storePath)
-        try await StoreSession.withOpen(at: url, noEmbedder: true) { memory in
-            try await memory.retractFact(
-                factId: FactRowID(rawValue: factID),
-                atMs: nil,
-                commit: commit
-            )
+        let memory = try await StoreSession.open(at: url, noEmbedder: true)
+        defer { Task { try? await memory.close() } }
 
-            switch store.format {
-            case .json:
-                printJSON([
-                    "status": "ok",
-                    "fact_id": factID,
-                    "committed": commit,
-                ])
-            case .text:
-                print("Fact \(factID) retracted (committed: \(commit)).")
-            }
+        try await memory.retractFact(
+            factId: FactRowID(rawValue: factID),
+            atMs: nil,
+            commit: commit
+        )
+
+        switch store.format {
+        case .json:
+            printJSON([
+                "status": "ok",
+                "fact_id": factID,
+                "committed": commit,
+            ])
+        case .text:
+            print("Fact \(factID) retracted (committed: \(commit)).")
         }
     }
 }
@@ -131,40 +128,41 @@ struct FactsQueryCommand: AsyncParsableCommand {
         let predicateKey = predicate.map { PredicateKey($0) }
 
         let url = try StoreSession.resolveURL(store.storePath)
-        try await StoreSession.withOpen(at: url, noEmbedder: true) { memory in
-            let result = try await memory.facts(
-                about: subjectKey,
-                predicate: predicateKey,
-                asOfMs: Int64.max,
-                limit: limit
-            )
+        let memory = try await StoreSession.open(at: url, noEmbedder: true)
+        defer { Task { try? await memory.close() } }
 
-            switch store.format {
-            case .json:
-                let hits: [[String: Any]] = result.hits.map { hit in
-                    [
-                        "fact_id": hit.factId.rawValue,
-                        "subject": hit.fact.subject.rawValue,
-                        "predicate": hit.fact.predicate.rawValue,
-                        "object": factValueToJSON(hit.fact.object),
-                        "is_open_ended": hit.isOpenEnded,
-                        "evidence_count": hit.evidence.count,
-                    ]
-                }
-                printJSON([
-                    "count": result.hits.count,
-                    "truncated": result.wasTruncated,
-                    "hits": hits,
-                ])
-            case .text:
-                if result.hits.isEmpty {
-                    print("No facts found.")
-                } else {
-                    print("Found \(result.hits.count) fact(s)\(result.wasTruncated ? " (truncated)" : ""):")
-                    for hit in result.hits {
-                        let objStr = factValueToText(hit.fact.object)
-                        print("  [\(hit.factId.rawValue)] \(hit.fact.subject.rawValue) -[\(hit.fact.predicate.rawValue)]-> \(objStr)")
-                    }
+        let result = try await memory.facts(
+            about: subjectKey,
+            predicate: predicateKey,
+            asOfMs: Int64.max,
+            limit: limit
+        )
+
+        switch store.format {
+        case .json:
+            let hits: [[String: Any]] = result.hits.map { hit in
+                [
+                    "fact_id": hit.factId.rawValue,
+                    "subject": hit.fact.subject.rawValue,
+                    "predicate": hit.fact.predicate.rawValue,
+                    "object": factValueToJSON(hit.fact.object),
+                    "is_open_ended": hit.isOpenEnded,
+                    "evidence_count": hit.evidence.count,
+                ]
+            }
+            printJSON([
+                "count": result.hits.count,
+                "truncated": result.wasTruncated,
+                "hits": hits,
+            ])
+        case .text:
+            if result.hits.isEmpty {
+                print("No facts found.")
+            } else {
+                print("Found \(result.hits.count) fact(s)\(result.wasTruncated ? " (truncated)" : ""):")
+                for hit in result.hits {
+                    let objStr = factValueToText(hit.fact.object)
+                    print("  [\(hit.factId.rawValue)] \(hit.fact.subject.rawValue) -[\(hit.fact.predicate.rawValue)]-> \(objStr)")
                 }
             }
         }
@@ -188,21 +186,6 @@ private func parseObjectValue(_ raw: String) -> FactValue {
         return .bool(false)
     default:
         return .string(raw)
-    }
-}
-
-private func parseVersionRelation(_ raw: String) throws -> VersionRelation {
-    switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-    case "sets":
-        return .sets
-    case "updates":
-        return .updates
-    case "extends":
-        return .extends
-    case "retracts":
-        return .retracts
-    default:
-        throw CLIError("--relation must be one of: sets, updates, extends, retracts")
     }
 }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-package enum WaxWriterPolicy: Sendable, Equatable {
+public enum WaxWriterPolicy: Sendable, Equatable {
     case wait
     case fail
     case timeout(Duration)

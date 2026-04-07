@@ -1,7 +1,7 @@
 import Foundation
 
 /// Typed value for a structured fact.
-package enum FactValue: Sendable, Equatable, Hashable {
+public enum FactValue: Sendable, Equatable, Hashable {
     case string(String)
     case int(Int64)
     case double(Double)

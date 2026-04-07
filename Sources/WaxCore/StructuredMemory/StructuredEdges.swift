@@ -1,19 +1,19 @@
 import Foundation
 
 /// Direction for entity-valued edges.
-package enum StructuredEdgeDirection: Sendable, Equatable {
+public enum StructuredEdgeDirection: Sendable, Equatable {
     case outbound
     case inbound
 }
 
 /// Edge hit between entities.
-package struct EdgeHit: Sendable, Equatable {
-    package var factId: FactRowID
-    package var predicate: PredicateKey
-    package var direction: StructuredEdgeDirection
-    package var neighbor: EntityKey
+public struct EdgeHit: Sendable, Equatable {
+    public var factId: FactRowID
+    public var predicate: PredicateKey
+    public var direction: StructuredEdgeDirection
+    public var neighbor: EntityKey
 
-    package init(
+    public init(
         factId: FactRowID,
         predicate: PredicateKey,
         direction: StructuredEdgeDirection,
@@ -27,11 +27,11 @@ package struct EdgeHit: Sendable, Equatable {
 }
 
 /// Result set for structured edge queries.
-package struct StructuredEdgesResult: Sendable, Equatable {
-    package var hits: [EdgeHit]
-    package var wasTruncated: Bool
+public struct StructuredEdgesResult: Sendable, Equatable {
+    public var hits: [EdgeHit]
+    public var wasTruncated: Bool
 
-    package init(hits: [EdgeHit], wasTruncated: Bool) {
+    public init(hits: [EdgeHit], wasTruncated: Bool) {
         self.hits = hits
         self.wasTruncated = wasTruncated
     }

@@ -1,17 +1,16 @@
 @preconcurrency import Dispatch
 
-package struct WaxOptions: Sendable {
-    package var walFsyncPolicy: WALFsyncPolicy
-    package var walProactiveCommitThresholdPercent: UInt8?
-    package var walProactiveCommitMaxWalSizeBytes: UInt64?
-    package var walProactiveCommitMinPendingBytes: UInt64
-    package var walReplayStateSnapshotEnabled: Bool
-    package var lockWaitTimeout: Duration?
-    package var ioQueueLabel: String
-    package var ioQueueQosClass: DispatchQoS.QoSClass
-    package var ioQueueRelativePriority: Int
+public struct WaxOptions: Sendable {
+    public var walFsyncPolicy: WALFsyncPolicy
+    public var walProactiveCommitThresholdPercent: UInt8?
+    public var walProactiveCommitMaxWalSizeBytes: UInt64?
+    public var walProactiveCommitMinPendingBytes: UInt64
+    public var walReplayStateSnapshotEnabled: Bool
+    public var ioQueueLabel: String
+    public var ioQueueQosClass: DispatchQoS.QoSClass
+    public var ioQueueRelativePriority: Int
 
-    package var ioQueueQos: DispatchQoS {
+    public var ioQueueQos: DispatchQoS {
         get {
             DispatchQoS(
                 qosClass: ioQueueQosClass,
@@ -24,13 +23,12 @@ package struct WaxOptions: Sendable {
         }
     }
 
-    package init(
+    public init(
         walFsyncPolicy: WALFsyncPolicy = .onCommit,
         walProactiveCommitThresholdPercent: UInt8? = 80,
         walProactiveCommitMaxWalSizeBytes: UInt64? = 4 * 1024 * 1024,
         walProactiveCommitMinPendingBytes: UInt64 = 128 * 1024,
         walReplayStateSnapshotEnabled: Bool = false,
-        lockWaitTimeout: Duration? = nil,
         ioQueueLabel: String = "com.wax.io",
         ioQueueQos: DispatchQoS = .userInitiated
     ) {
@@ -39,7 +37,6 @@ package struct WaxOptions: Sendable {
         self.walProactiveCommitMaxWalSizeBytes = walProactiveCommitMaxWalSizeBytes
         self.walProactiveCommitMinPendingBytes = walProactiveCommitMinPendingBytes
         self.walReplayStateSnapshotEnabled = walReplayStateSnapshotEnabled
-        self.lockWaitTimeout = lockWaitTimeout
         self.ioQueueLabel = ioQueueLabel
         self.ioQueueQosClass = ioQueueQos.qosClass
         self.ioQueueRelativePriority = ioQueueQos.relativePriority

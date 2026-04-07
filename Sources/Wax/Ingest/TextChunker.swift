@@ -1,9 +1,9 @@
 import Foundation
 
-package enum TextChunker {
+public enum TextChunker {
     /// Deterministic, token-aware chunking using the same encoding as Fast RAG.
     /// - Returns: array of chunk strings (UTF-8), or `[text]` when it fits.
-    package static func chunk(text: String, strategy: ChunkingStrategy) async -> [String] {
+    public static func chunk(text: String, strategy: ChunkingStrategy) async -> [String] {
         switch strategy {
         case let .tokenCount(targetTokens, overlapTokens):
             return await tokenCountChunk(text: text, targetTokens: targetTokens, overlapTokens: overlapTokens)
@@ -11,7 +11,7 @@ package enum TextChunker {
     }
 
     /// Stream chunked text without materializing the full chunk list in memory.
-    package static func stream(text: String, strategy: ChunkingStrategy) -> AsyncStream<String> {
+    public static func stream(text: String, strategy: ChunkingStrategy) -> AsyncStream<String> {
         switch strategy {
         case let .tokenCount(targetTokens, overlapTokens):
             return tokenCountChunkStream(text: text, targetTokens: targetTokens, overlapTokens: overlapTokens)

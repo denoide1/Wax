@@ -1,27 +1,27 @@
 import Foundation
 
-package enum WaxMemoryToolAction: String, Sendable, CaseIterable, Equatable {
+public enum WaxMemoryToolAction: String, Sendable, CaseIterable, Equatable {
     case remember
     case recall
     case search
 
-    package static func parse(_ rawValue: String) -> WaxMemoryToolAction? {
+    public static func parse(_ rawValue: String) -> WaxMemoryToolAction? {
         let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return WaxMemoryToolAction(rawValue: normalized)
     }
 }
 
-package struct WaxMemoryToolConfig: Sendable, Equatable {
-    package var recallMaxItems: Int
-    package var searchTopK: Int
-    package var maxSearchTopK: Int
-    package var searchAlpha: Float
-    package var queryEmbeddingPolicy: MemoryOrchestrator.QueryEmbeddingPolicy
-    package var includeScores: Bool
-    package var maxItemCharacters: Int
-    package var rememberMetadata: [String: String]
+public struct WaxMemoryToolConfig: Sendable, Equatable {
+    public var recallMaxItems: Int
+    public var searchTopK: Int
+    public var maxSearchTopK: Int
+    public var searchAlpha: Float
+    public var queryEmbeddingPolicy: MemoryOrchestrator.QueryEmbeddingPolicy
+    public var includeScores: Bool
+    public var maxItemCharacters: Int
+    public var rememberMetadata: [String: String]
 
-    package init(
+    public init(
         recallMaxItems: Int = 6,
         searchTopK: Int = 8,
         maxSearchTopK: Int = 20,
@@ -44,33 +44,33 @@ package struct WaxMemoryToolConfig: Sendable, Equatable {
         self.rememberMetadata = rememberMetadata
     }
 
-    package static let `default` = WaxMemoryToolConfig()
+    public static let `default` = WaxMemoryToolConfig()
 
-    package func topK(_ requested: Int?) -> Int {
+    public func topK(_ requested: Int?) -> Int {
         let fallback = max(1, min(searchTopK, maxSearchTopK))
         guard let requested else { return fallback }
         return max(1, min(requested, maxSearchTopK))
     }
 
-    package func alpha(_ requested: Float?) -> Float {
+    public func alpha(_ requested: Float?) -> Float {
         let fallback = max(0, min(searchAlpha, 1))
         guard let requested else { return fallback }
         return max(0, min(requested, 1))
     }
 }
 
-package struct WaxMemoryToolRenderer: Sendable {
-    package init() {}
+public struct WaxMemoryToolRenderer: Sendable {
+    public init() {}
 
-    package static func renderError(_ message: String) -> String {
+    public static func renderError(_ message: String) -> String {
         "Wax memory tool error: \(message)"
     }
 
-    package static func renderRemember(contentLength: Int) -> String {
+    public static func renderRemember(contentLength: Int) -> String {
         "Stored memory (\(contentLength) characters)."
     }
 
-    package static func renderRecall(
+    public static func renderRecall(
         query: String,
         context: RAGContext,
         maxItems: Int,
@@ -97,7 +97,7 @@ package struct WaxMemoryToolRenderer: Sendable {
         return lines.joined(separator: "\n")
     }
 
-    package static func renderSearch(
+    public static func renderSearch(
         query: String,
         hits: [MemoryOrchestrator.MemorySearchHit],
         includeScores: Bool,

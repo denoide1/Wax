@@ -1,20 +1,20 @@
 import Foundation
 
 /// Context for selecting the appropriate surrogate tier.
-package struct TierSelectionContext: Sendable {
+public struct TierSelectionContext: Sendable {
     /// Frame creation timestamp (milliseconds)
-    package var frameTimestamp: Int64
+    public var frameTimestamp: Int64
     
     /// Access statistics for the frame (if available)
-    package var accessStats: FrameAccessStats?
+    public var accessStats: FrameAccessStats?
     
     /// Query signals (if query-aware selection enabled)
-    package var querySignals: QuerySignals?
+    public var querySignals: QuerySignals?
     
     /// Current time (milliseconds)
-    package var nowMs: Int64
+    public var nowMs: Int64
     
-    package init(
+    public init(
         frameTimestamp: Int64,
         accessStats: FrameAccessStats? = nil,
         querySignals: QuerySignals? = nil,
@@ -28,14 +28,14 @@ package struct TierSelectionContext: Sendable {
 }
 
 /// Selects the appropriate surrogate tier based on policy and context.
-package struct SurrogateTierSelector: Sendable {
-    package var policy: TierSelectionPolicy
-    package var scorer: ImportanceScorer
+public struct SurrogateTierSelector: Sendable {
+    public var policy: TierSelectionPolicy
+    public var scorer: ImportanceScorer
     
     /// How much query specificity boosts importance (0.0 - 1.0)
-    package var queryBoostFactor: Float
+    public var queryBoostFactor: Float
     
-    package init(
+    public init(
         policy: TierSelectionPolicy = .importanceBalanced,
         scorer: ImportanceScorer = ImportanceScorer(),
         queryBoostFactor: Float = 0.15
@@ -46,7 +46,7 @@ package struct SurrogateTierSelector: Sendable {
     }
     
     /// Select the appropriate tier for a frame based on policy and context.
-    package func selectTier(context: TierSelectionContext) -> SurrogateTier {
+    public func selectTier(context: TierSelectionContext) -> SurrogateTier {
         switch policy {
         case .disabled:
             return .full
@@ -98,7 +98,7 @@ package struct SurrogateTierSelector: Sendable {
     /// Extract the appropriate tier text from surrogate data.
     ///
     /// Handles both hierarchical (JSON) and legacy (plain text) formats.
-    package static func extractTier(from data: Data, tier: SurrogateTier) -> String? {
+    public static func extractTier(from data: Data, tier: SurrogateTier) -> String? {
         // Try hierarchical JSON format first
         if let tiers = try? JSONDecoder().decode(SurrogateTiers.self, from: data) {
             switch tier {

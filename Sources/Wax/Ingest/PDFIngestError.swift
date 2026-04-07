@@ -1,14 +1,14 @@
 import Foundation
 
 /// Errors that can occur while ingesting a PDF.
-package enum PDFIngestError: Error, Sendable, Equatable {
+public enum PDFIngestError: Error, Sendable, Equatable {
     case fileNotFound(url: URL)
     case loadFailed(url: URL)
     case noExtractableText(url: URL, pageCount: Int)
 }
 
 extension PDFIngestError: LocalizedError {
-    package var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case let .fileNotFound(url):
             return "PDF file not found: \(url.path)"

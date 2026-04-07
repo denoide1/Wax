@@ -55,16 +55,11 @@ struct WaxCrashHarness {
     private static let scenarioEnv = "WAX_CRASH_HARNESS_SCENARIO"
     private static let crashCheckpointEnv = "WAX_CRASH_INJECT_CHECKPOINT"
 
-    private static func writeStderr(_ message: String) {
-        guard let data = (message + "\n").data(using: .utf8) else { return }
-        FileHandle.standardError.write(data)
-    }
-
     static func main() async {
         do {
             if ProcessInfo.processInfo.environment[roleEnv] == "child" {
                 try await runChild()
-                writeStderr("child path returned without injected crash")
+                fputs("child path returned without injected crash\n", stderr)
                 Foundation.exit(33)
             }
 
@@ -75,7 +70,7 @@ struct WaxCrashHarness {
                 print("PASS \(scenario.rawValue)")
             }
         } catch {
-            writeStderr("FAIL \(error)")
+            fputs("FAIL \(error)\n", stderr)
             Foundation.exit(1)
         }
     }

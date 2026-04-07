@@ -1,12 +1,12 @@
 import Foundation
 
 /// Structured fact triple.
-package struct StructuredFact: Sendable, Equatable {
-    package var subject: EntityKey
-    package var predicate: PredicateKey
-    package var object: FactValue
+public struct StructuredFact: Sendable, Equatable {
+    public var subject: EntityKey
+    public var predicate: PredicateKey
+    public var object: FactValue
 
-    package init(subject: EntityKey, predicate: PredicateKey, object: FactValue) {
+    public init(subject: EntityKey, predicate: PredicateKey, object: FactValue) {
         self.subject = subject
         self.predicate = predicate
         self.object = object
@@ -14,14 +14,14 @@ package struct StructuredFact: Sendable, Equatable {
 }
 
 /// Result hit for a structured fact query.
-package struct StructuredFactHit: Sendable, Equatable {
-    package var factId: FactRowID
-    package var fact: StructuredFact
-    package var evidence: [StructuredEvidence]
-    /// True iff the underlying span is package-ended on both axes.
-    package var isOpenEnded: Bool
+public struct StructuredFactHit: Sendable, Equatable {
+    public var factId: FactRowID
+    public var fact: StructuredFact
+    public var evidence: [StructuredEvidence]
+    /// True iff the underlying span is open-ended on both axes.
+    public var isOpenEnded: Bool
 
-    package init(
+    public init(
         factId: FactRowID,
         fact: StructuredFact,
         evidence: [StructuredEvidence],
@@ -35,11 +35,11 @@ package struct StructuredFactHit: Sendable, Equatable {
 }
 
 /// Result set for structured fact queries.
-package struct StructuredFactsResult: Sendable, Equatable {
-    package var hits: [StructuredFactHit]
-    package var wasTruncated: Bool
+public struct StructuredFactsResult: Sendable, Equatable {
+    public var hits: [StructuredFactHit]
+    public var wasTruncated: Bool
 
-    package init(hits: [StructuredFactHit], wasTruncated: Bool) {
+    public init(hits: [StructuredFactHit], wasTruncated: Bool) {
         self.hits = hits
         self.wasTruncated = wasTruncated
     }

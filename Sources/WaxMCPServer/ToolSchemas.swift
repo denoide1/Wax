@@ -15,18 +15,13 @@ enum ToolSchemas {
         ),
         Tool(
             name: "wax_recall",
-            description: "Recall context for a query using Wax RAG assembly. Reads require wax_flush when pending writes exist.",
+            description: "Recall context for a query using Wax RAG assembly.",
             inputSchema: waxRecall
         ),
         Tool(
             name: "wax_search",
-            description: "Run direct Wax search and return ranked raw hits. Reads require wax_flush when pending writes exist.",
+            description: "Run direct Wax search and return ranked raw hits.",
             inputSchema: waxSearch
-        ),
-        Tool(
-            name: "wax_corpus_search",
-            description: "Build or refresh a shared corpus store from many session .wax files, then search it with provenance-rich results.",
-            inputSchema: waxCorpusSearch
         ),
         Tool(
             name: "wax_flush",
@@ -40,17 +35,17 @@ enum ToolSchemas {
         ),
         Tool(
             name: "wax_session_start",
-            description: "Create a process-local session UUID for explicit memory scoping and return its session_id.",
+            description: "Start a new scoped memory session and return a session_id.",
             inputSchema: waxSessionStart
         ),
         Tool(
             name: "wax_session_end",
-            description: "Mark a process-local MCP session inactive. Pass session_id when multiple sessions are active.",
+            description: "End the active scoped memory session.",
             inputSchema: waxSessionEnd
         ),
         Tool(
             name: "wax_handoff",
-            description: "Store a cross-session handoff note for later retrieval. Commit by default; set commit=false to batch with wax_flush.",
+            description: "Store a cross-session handoff note for later retrieval. Call wax_flush to persist.",
             inputSchema: waxHandoff
         ),
         Tool(
@@ -101,16 +96,12 @@ enum ToolSchemas {
             ],
             "session_id": [
                 "type": "string",
-                "description": "Optional session UUID to scope this write explicitly. metadata.session_id is rejected.",
+                "description": "Optional session UUID to scope this write explicitly.",
             ],
             "metadata": [
                 "type": "object",
                 "description": "Optional metadata map. Scalar values are coerced to strings.",
-                "additionalProperties": scalarMetadataValueSchema,
-            ],
-            "commit": [
-                "type": "boolean",
-                "description": "Commit immediately. Default: true. Set false to batch with wax_flush before recall/search reads.",
+                "additionalProperties": true,
             ],
         ],
         required: ["content"]
@@ -132,30 +123,6 @@ enum ToolSchemas {
                 "type": "string",
                 "description": "Optional session UUID for scoped recall.",
             ],
-            "mode": [
-                "type": "string",
-                "description": "Optional search mode override for recall retrieval.",
-                "enum": ["text", "hybrid"],
-            ],
-            "alpha": [
-                "type": "number",
-                "description": "Optional hybrid alpha in [0,1]. Only valid when mode=hybrid.",
-                "minimum": 0.0,
-                "maximum": 1.0,
-            ],
-            "search_top_k": [
-                "type": "integer",
-                "description": "Optional retrieval top-k for recall search stage. Defaults to limit. Legacy alias: topK.",
-                "minimum": 1,
-                "maximum": 200,
-            ],
-            "topK": [
-                "type": "integer",
-                "description": "Deprecated legacy alias for search_top_k.",
-                "minimum": 1,
-                "maximum": 200,
-            ],
-            "filters": searchFilters,
         ],
         required: ["query"]
     )
@@ -181,71 +148,14 @@ enum ToolSchemas {
                 "type": "string",
                 "description": "Optional session UUID for scoped search.",
             ],
-            "alpha": [
-                "type": "number",
-                "description": "Optional hybrid alpha in [0,1]. Only valid when mode=hybrid.",
-                "minimum": 0.0,
-                "maximum": 1.0,
-            ],
-            "filters": searchFilters,
         ],
         required: ["query"]
     )
 
     static let waxFlush: Value = emptyObjectSchema()
     static let waxStats: Value = emptyObjectSchema()
-    static let waxCorpusSearch: Value = objectSchema(
-        properties: [
-            "query": [
-                "type": "string",
-                "description": "Search query text.",
-            ],
-            "sessions_dir": [
-                "type": "string",
-                "description": "Directory containing source session .wax stores. Default: ~/.wax/sessions",
-            ],
-            "corpus_store_path": [
-                "type": "string",
-                "description": "Path to the shared corpus store. Default: ~/.wax/corpus.wax",
-            ],
-            "rebuild": [
-                "type": "boolean",
-                "description": "Rebuild the shared corpus before searching. Default: true. If false and the corpus is missing, it is still built.",
-            ],
-            "recursive": [
-                "type": "boolean",
-                "description": "Recursively scan sessions_dir for .wax files. Default: true.",
-            ],
-            "mode": [
-                "type": "string",
-                "description": "Search mode for the shared corpus.",
-                "enum": ["text", "hybrid"],
-            ],
-            "alpha": [
-                "type": "number",
-                "description": "Optional hybrid alpha in [0,1]. Only valid when mode=hybrid.",
-                "minimum": 0.0,
-                "maximum": 1.0,
-            ],
-            "topK": [
-                "type": "integer",
-                "description": "Max hit count. Default: 10.",
-                "minimum": 1,
-                "maximum": 200,
-            ],
-        ],
-        required: ["query"]
-    )
     static let waxSessionStart: Value = emptyObjectSchema()
-    static let waxSessionEnd: Value = objectSchema(
-        properties: [
-            "session_id": [
-                "type": "string",
-                "description": "Optional session UUID to end explicitly. Required when more than one MCP session is active.",
-            ],
-        ],
-        required: []
-    )
+    static let waxSessionEnd: Value = emptyObjectSchema()
 
     static let waxHandoff: Value = objectSchema(
         properties: [
@@ -266,40 +176,8 @@ enum ToolSchemas {
                 "description": "Optional list of pending tasks.",
                 "items": ["type": "string"],
             ],
-            "commit": [
-                "type": "boolean",
-                "description": "Commit immediately. Default: true. Set false to batch with wax_flush before dependent reads.",
-            ],
         ],
         required: ["content"]
-    )
-
-    static let searchFilters: Value = objectSchema(
-        properties: [
-            "metadata": [
-                "type": "object",
-                "description": "Exact metadata entry matches as a flat object, or wrapped as {\"exact\": {...}}. Scalar values are coerced to strings.",
-                "additionalProperties": scalarMetadataValueSchema,
-            ],
-            "labels": [
-                "type": "array",
-                "description": "Frame labels that must all be present.",
-                "items": ["type": "string"],
-            ],
-            "time_after_ms": [
-                "type": "integer",
-                "description": "Optional inclusive lower bound timestamp (ms since epoch).",
-            ],
-            "time_before_ms": [
-                "type": "integer",
-                "description": "Optional exclusive upper bound timestamp (ms since epoch).",
-            ],
-            "include_surrogates": [
-                "type": "boolean",
-                "description": "Whether surrogate frames can be included. Default: false.",
-            ],
-        ],
-        required: []
     )
 
     static let waxHandoffLatest: Value = objectSchema(
@@ -329,7 +207,7 @@ enum ToolSchemas {
             ],
             "commit": [
                 "type": "boolean",
-                "description": "Commit immediately. Default: true. Set false to batch with wax_flush before dependent reads.",
+                "description": "Commit immediately. Default: true. Set false to batch with wax_flush.",
             ],
         ],
         required: ["key", "kind"]
@@ -397,7 +275,7 @@ enum ToolSchemas {
             ],
             "commit": [
                 "type": "boolean",
-                "description": "Commit immediately. Default: true. Set false to batch with wax_flush before dependent reads.",
+                "description": "Commit immediately. Default: true. Set false to batch with wax_flush.",
             ],
         ],
         required: ["subject", "predicate", "object"]
@@ -415,7 +293,7 @@ enum ToolSchemas {
             ],
             "commit": [
                 "type": "boolean",
-                "description": "Commit immediately. Default: true. Set false to batch with wax_flush before dependent reads.",
+                "description": "Commit immediately. Default: true. Set false to batch with wax_flush.",
             ],
         ],
         required: ["fact_id"]
@@ -469,15 +347,6 @@ enum ToolSchemas {
             "additionalProperties": false,
         ]
     }
-
-    private static let scalarMetadataValueSchema: Value = [
-        "oneOf": [
-            ["type": "string"],
-            ["type": "integer"],
-            ["type": "number"],
-            ["type": "boolean"],
-        ],
-    ]
 
     private static func emptyObjectSchema() -> Value {
         objectSchema(properties: [:], required: [])

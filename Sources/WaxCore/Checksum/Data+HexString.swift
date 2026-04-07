@@ -1,6 +1,6 @@
 import Foundation
 
-package extension Data {
+public extension Data {
     /// Lowercased hex string encoding.
     var hexString: String {
         var out = String()

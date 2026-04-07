@@ -73,39 +73,6 @@ func memoryOrchestratorRecallWithoutFlushFindsRecentText() async throws {
 }
 
 @Test
-func memoryOrchestratorRecallSurfacesStoredMetadata() async throws {
-    try await TempFiles.withTempFile { url in
-        var config = OrchestratorConfig.default
-        config.enableVectorSearch = false
-        config.chunking = .tokenCount(targetTokens: 10, overlapTokens: 2)
-        config.rag = FastRAGConfig(
-            maxContextTokens: 80,
-            expansionMaxTokens: 30,
-            snippetMaxTokens: 15,
-            maxSnippets: 10,
-            searchTopK: 25,
-            searchMode: .textOnly
-        )
-
-        let orchestrator = try await MemoryOrchestrator(at: url, config: config)
-        try await orchestrator.remember(
-            "A New Habit Tracker is a SwiftUI app for tracking user habits.",
-            metadata: [
-                "id": "doc-123",
-                "title": "A New Habit Tracker",
-            ]
-        )
-
-        let ctx = try await orchestrator.recall(query: "Habit Tracker")
-        #expect(!ctx.items.isEmpty)
-        #expect(ctx.items.contains { $0.metadata["id"] == "doc-123" })
-        #expect(ctx.items.contains { $0.metadata["title"] == "A New Habit Tracker" })
-
-        try await orchestrator.close()
-    }
-}
-
-@Test
 func memoryOrchestratorSessionTaggingAndChunkMetadataPersist() async throws {
     try await TempFiles.withTempFile { url in
         var config = OrchestratorConfig.default
@@ -402,71 +369,6 @@ func memoryOrchestratorRespectsIngestBatchingAndOrder() async throws {
         #expect(indices == Array(0..<UInt32(chunkCount)))
         #expect(Set(counts) == [UInt32(chunkCount)])
         try await reopened.close()
-    }
-}
-
-@Suite(.serialized)
-struct MemoryOrchestratorIngestFastPathTests {
-    @Test
-    func memoryOrchestratorSingleChunkRememberAvoidsBatchPreparationPath() async throws {
-        try await TempFiles.withTempFile { url in
-            var config = OrchestratorConfig.default
-            config.ingestBatchSize = 32
-            config.ingestConcurrency = 1
-            config.enableVectorSearch = true
-            config.enableTextSearch = true
-            config.chunking = .tokenCount(targetTokens: 220, overlapTokens: 24)
-
-            let factory = BenchmarkTextFactory(sentencesPerDocument: 10)
-            let content = factory.makeDocument(index: 0)
-            let chunks = await TextChunker.chunk(text: content, strategy: config.chunking)
-            #expect(chunks.count == 1)
-
-            let orchestrator = try await MemoryOrchestrator(
-                at: url,
-                config: config,
-                embedder: DeterministicEmbedder(dimensions: 8)
-            )
-            MemoryOrchestrator._resetBatchPreparationPathCallCountForTests()
-
-            try await orchestrator.remember(content)
-
-            #expect(MemoryOrchestrator._batchPreparationPathCallCountForTests() == 0)
-            try await orchestrator.close()
-        }
-    }
-
-    @Test
-    func memoryOrchestratorRepeatedSingleChunkRemembersEnsureMemoryBindingOnce() async throws {
-        try await TempFiles.withTempFile { url in
-            var config = OrchestratorConfig.default
-            config.ingestBatchSize = 32
-            config.ingestConcurrency = 1
-            config.enableVectorSearch = true
-            config.enableTextSearch = true
-            config.chunking = .tokenCount(targetTokens: 220, overlapTokens: 24)
-
-            let factory = BenchmarkTextFactory(sentencesPerDocument: 10)
-            let contents = (0..<3).map(factory.makeDocument(index:))
-            for content in contents {
-                let chunks = await TextChunker.chunk(text: content, strategy: config.chunking)
-                #expect(chunks.count == 1)
-            }
-
-            let orchestrator = try await MemoryOrchestrator(
-                at: url,
-                config: config,
-                embedder: DeterministicEmbedder(dimensions: 8)
-            )
-            MemoryOrchestrator._resetMemoryBindingEnsureCallCountForTests()
-
-            for content in contents {
-                try await orchestrator.remember(content)
-            }
-
-            #expect(MemoryOrchestrator._memoryBindingEnsureCallCountForTests() == 1)
-            try await orchestrator.close()
-        }
     }
 }
 

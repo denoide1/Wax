@@ -2,7 +2,6 @@ import Testing
 import USearch
 import GRDB
 import Logging
-@testable import WaxVectorSearch
 
 @Test func usearchInitializes() throws {
     let index = try USearchIndex.make(
@@ -13,12 +12,6 @@ import Logging
     )
     #expect(String(describing: index).contains("USearchIndex"))
 }
-
-#if canImport(Metal) && canImport(MetalANNS)
-@Test func metalANNSVectorEngineInitializes() throws {
-    _ = try MetalANNSVectorEngine(metric: .cosine, dimensions: 128)
-}
-#endif
 
 @Test func grdbInitializes() throws {
     let dbQueue = try DatabaseQueue()

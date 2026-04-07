@@ -1,6 +1,6 @@
 import Foundation
 
-package protocol SurrogateGenerator: Sendable {
+public protocol SurrogateGenerator: Sendable {
     /// Stable identifier for persisted metadata (e.g. "extractive_v1", "smollm_360m_q4_v1")
     var algorithmID: String { get }
 
@@ -11,7 +11,7 @@ package protocol SurrogateGenerator: Sendable {
 
 /// Extended protocol for hierarchical surrogate generation.
 /// Generates all compression tiers in a single optimized pass.
-package protocol HierarchicalSurrogateGenerator: SurrogateGenerator {
+public protocol HierarchicalSurrogateGenerator: SurrogateGenerator {
     /// Generate all compression tiers for a source text.
     func generateTiers(
         sourceText: String,
@@ -21,7 +21,7 @@ package protocol HierarchicalSurrogateGenerator: SurrogateGenerator {
 
 // Default implementation for HierarchicalSurrogateGenerator
 extension HierarchicalSurrogateGenerator {
-    package func generateTiers(
+    public func generateTiers(
         sourceText: String,
         config: SurrogateTierConfig
     ) async throws -> SurrogateTiers {

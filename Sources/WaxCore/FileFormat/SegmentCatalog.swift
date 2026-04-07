@@ -26,15 +26,15 @@ private enum SegmentCatalogValidation {
     }
 }
 
-package struct SegmentCatalogEntry: Equatable, Sendable {
-    package var segmentId: UInt64
-    package var bytesOffset: UInt64
-    package var bytesLength: UInt64
-    package var checksum: Data
-    package var compression: SegmentCompression
-    package var kind: SegmentKind
+public struct SegmentCatalogEntry: Equatable, Sendable {
+    public var segmentId: UInt64
+    public var bytesOffset: UInt64
+    public var bytesLength: UInt64
+    public var checksum: Data
+    public var compression: SegmentCompression
+    public var kind: SegmentKind
 
-    package init(
+    public init(
         segmentId: UInt64,
         bytesOffset: UInt64,
         bytesLength: UInt64,
@@ -51,16 +51,16 @@ package struct SegmentCatalogEntry: Equatable, Sendable {
     }
 }
 
-package struct SegmentCatalog: Equatable, Sendable {
-    package var entries: [SegmentCatalogEntry]
+public struct SegmentCatalog: Equatable, Sendable {
+    public var entries: [SegmentCatalogEntry]
 
-    package init(entries: [SegmentCatalogEntry] = []) {
+    public init(entries: [SegmentCatalogEntry] = []) {
         self.entries = entries
     }
 }
 
 extension SegmentCatalog: BinaryCodable {
-    package mutating func encode(to encoder: inout BinaryEncoder) throws {
+    public mutating func encode(to encoder: inout BinaryEncoder) throws {
         let sorted = entries.sorted {
             if $0.bytesOffset != $1.bytesOffset { return $0.bytesOffset < $1.bytesOffset }
             return $0.segmentId < $1.segmentId
@@ -83,7 +83,7 @@ extension SegmentCatalog: BinaryCodable {
         }
     }
 
-    package static func decode(from decoder: inout BinaryDecoder) throws -> SegmentCatalog {
+    public static func decode(from decoder: inout BinaryDecoder) throws -> SegmentCatalog {
         let count = Int(try decoder.decode(UInt32.self))
         guard count <= Constants.maxArrayCount else {
             throw WaxError.invalidToc(reason: "segment catalog count \(count) exceeds limit \(Constants.maxArrayCount)")

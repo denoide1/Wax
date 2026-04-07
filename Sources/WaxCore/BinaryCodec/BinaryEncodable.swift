@@ -1,11 +1,11 @@
 import Foundation
 
-package protocol BinaryEncodable {
+public protocol BinaryEncodable {
     mutating func encode(to encoder: inout BinaryEncoder) throws
 }
 
-package protocol BinaryDecodable {
+public protocol BinaryDecodable {
     static func decode(from decoder: inout BinaryDecoder) throws -> Self
 }
 
-package typealias BinaryCodable = BinaryEncodable & BinaryDecodable
+public typealias BinaryCodable = BinaryEncodable & BinaryDecodable

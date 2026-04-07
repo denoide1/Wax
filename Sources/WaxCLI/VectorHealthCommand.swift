@@ -8,14 +8,18 @@ struct VectorHealthCommand: AsyncParsableCommand {
         abstract: "Verify MiniLM vector search health with a semantic probe"
     )
 
-    @OptionGroup var store: VectorStoreOptions
+    @Option(name: .customLong("store-path"), help: "Path to Wax memory store (.wax)")
+    var storePath: String = StoreSession.defaultStorePath
+
+    @Option(name: .customLong("format"), help: "Output format: json (default) or text")
+    var format: OutputFormat = .json
 
     func runAsync() async throws {
         let primary = try await checkPrimaryStore()
         let probe = try await runSemanticProbe()
         let healthy = primary.vectorSearchEnabled && primary.embedderIdentity != nil && probe.passed
 
-        switch store.format {
+        switch format {
         case .json:
             let embedder: Any = {
                 guard let identity = primary.embedderIdentity else { return NSNull() }
@@ -84,64 +88,56 @@ private extension VectorHealthCommand {
     }
 
     func checkPrimaryStore() async throws -> PrimaryStoreCheck {
-        let url = try StoreSession.resolveURL(store.storePath)
-        return try await StoreSession.withOpen(
-            at: url,
-            noEmbedder: store.noEmbedder,
-            embedderChoice: store.embedder,
-            requireVector: true
-        ) { memory in
-            let stats = await memory.runtimeStats()
-            return PrimaryStoreCheck(
-                path: stats.storeURL.path,
-                vectorSearchEnabled: stats.vectorSearchEnabled,
-                embedderIdentity: stats.embedderIdentity
-            )
-        }
+        let url = try StoreSession.resolveURL(storePath)
+        let memory = try await StoreSession.open(at: url, noEmbedder: false)
+        defer { Task { try? await memory.close() } }
+
+        let stats = await memory.runtimeStats()
+        return PrimaryStoreCheck(
+            path: stats.storeURL.path,
+            vectorSearchEnabled: stats.vectorSearchEnabled,
+            embedderIdentity: stats.embedderIdentity
+        )
     }
 
     func runSemanticProbe() async throws -> SemanticProbeResult {
         let probeURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("wax-vector-health-\(UUID().uuidString).wax")
+        let memory = try await StoreSession.open(at: probeURL, noEmbedder: false)
         defer {
+            Task { try? await memory.close() }
             try? FileManager.default.removeItem(at: probeURL)
         }
-        return try await StoreSession.withOpen(
-            at: probeURL,
-            noEmbedder: store.noEmbedder,
-            embedderChoice: store.embedder,
-            requireVector: true
-        ) { memory in
-            let expectedDocument = "An automobile needs periodic maintenance and tire rotation."
-            try await memory.remember(expectedDocument, metadata: ["probe": "vector-health"])
-            try await memory.remember(
-                "Bananas are a tropical fruit often eaten in smoothies.",
-                metadata: ["probe": "vector-health"]
-            )
-            try await memory.flush()
 
-            let hits = try await memory.search(
-                query: "car service",
-                mode: .hybrid(alpha: 0.5),
-                topK: 3,
-                frameFilter: nil
-            )
+        let expectedDocument = "An automobile needs periodic maintenance and tire rotation."
+        try await memory.remember(expectedDocument, metadata: ["probe": "vector-health"])
+        try await memory.remember(
+            "Bananas are a tropical fruit often eaten in smoothies.",
+            metadata: ["probe": "vector-health"]
+        )
+        try await memory.flush()
 
-            let topHit = hits.first
-            let vectorSourceSeen = hits.contains(where: { $0.sources.contains(.vector) })
-            let expectedDocMatched = hits.contains {
-                ($0.previewText ?? "").localizedCaseInsensitiveContains("automobile")
-            }
-            let topPreview = topHit?.previewText ?? ""
-            let topSources = (topHit?.sources ?? []).map(\.rawValue)
+        let hits = try await memory.search(
+            query: "car service",
+            mode: .hybrid(alpha: 0.5),
+            topK: 3,
+            frameFilter: nil
+        )
 
-            return SemanticProbeResult(
-                passed: vectorSourceSeen && expectedDocMatched,
-                vectorSourceSeen: vectorSourceSeen,
-                expectedDocMatched: expectedDocMatched,
-                topPreview: topPreview,
-                topSources: topSources
-            )
+        let topHit = hits.first
+        let vectorSourceSeen = hits.contains(where: { $0.sources.contains(.vector) })
+        let expectedDocMatched = hits.contains {
+            ($0.previewText ?? "").localizedCaseInsensitiveContains("automobile")
         }
+        let topPreview = topHit?.previewText ?? ""
+        let topSources = (topHit?.sources ?? []).map(\.rawValue)
+
+        return SemanticProbeResult(
+            passed: vectorSourceSeen && expectedDocMatched,
+            vectorSourceSeen: vectorSourceSeen,
+            expectedDocMatched: expectedDocMatched,
+            topPreview: topPreview,
+            topSources: topSources
+        )
     }
 }

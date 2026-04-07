@@ -1,12 +1,12 @@
 import Foundation
 
-package struct TimeIndexManifest: Equatable, Sendable {
-    package var bytesOffset: UInt64
-    package var bytesLength: UInt64
-    package var entryCount: UInt64
-    package var checksum: Data
+public struct TimeIndexManifest: Equatable, Sendable {
+    public var bytesOffset: UInt64
+    public var bytesLength: UInt64
+    public var entryCount: UInt64
+    public var checksum: Data
 
-    package init(bytesOffset: UInt64, bytesLength: UInt64, entryCount: UInt64, checksum: Data) {
+    public init(bytesOffset: UInt64, bytesLength: UInt64, entryCount: UInt64, checksum: Data) {
         self.bytesOffset = bytesOffset
         self.bytesLength = bytesLength
         self.entryCount = entryCount
@@ -15,7 +15,7 @@ package struct TimeIndexManifest: Equatable, Sendable {
 }
 
 extension TimeIndexManifest: BinaryCodable {
-    package mutating func encode(to encoder: inout BinaryEncoder) throws {
+    public mutating func encode(to encoder: inout BinaryEncoder) throws {
         encoder.encode(bytesOffset)
         encoder.encode(bytesLength)
         encoder.encode(entryCount)
@@ -25,7 +25,7 @@ extension TimeIndexManifest: BinaryCodable {
         encoder.encodeFixedBytes(checksum)
     }
 
-    package static func decode(from decoder: inout BinaryDecoder) throws -> TimeIndexManifest {
+    public static func decode(from decoder: inout BinaryDecoder) throws -> TimeIndexManifest {
         let bytesOffset = try decoder.decode(UInt64.self)
         let bytesLength = try decoder.decode(UInt64.self)
         let entryCount = try decoder.decode(UInt64.self)
@@ -39,25 +39,23 @@ extension TimeIndexManifest: BinaryCodable {
     }
 }
 
-package struct WaxTOC: Equatable, Sendable {
-    package var tocVersion: UInt64
-    package var frames: [FrameMeta]
-    package var indexes: IndexManifests
-    package var timeIndex: TimeIndexManifest?
-    package var segmentCatalog: SegmentCatalog
-    package var ticketRef: TicketRef
-    package var memoryBinding: MemoryBinding?
-    package var merkleRoot: Data
-    package var tocChecksum: Data
+public struct WaxTOC: Equatable, Sendable {
+    public var tocVersion: UInt64
+    public var frames: [FrameMeta]
+    public var indexes: IndexManifests
+    public var timeIndex: TimeIndexManifest?
+    public var segmentCatalog: SegmentCatalog
+    public var ticketRef: TicketRef
+    public var merkleRoot: Data
+    public var tocChecksum: Data
 
-    package init(
+    public init(
         tocVersion: UInt64,
         frames: [FrameMeta],
         indexes: IndexManifests,
         timeIndex: TimeIndexManifest?,
         segmentCatalog: SegmentCatalog,
         ticketRef: TicketRef,
-        memoryBinding: MemoryBinding? = nil,
         merkleRoot: Data,
         tocChecksum: Data
     ) {
@@ -67,12 +65,11 @@ package struct WaxTOC: Equatable, Sendable {
         self.timeIndex = timeIndex
         self.segmentCatalog = segmentCatalog
         self.ticketRef = ticketRef
-        self.memoryBinding = memoryBinding
         self.merkleRoot = merkleRoot
         self.tocChecksum = tocChecksum
     }
 
-    package static func emptyV1() -> WaxTOC {
+    public static func emptyV1() -> WaxTOC {
         WaxTOC(
             tocVersion: 1,
             frames: [],
@@ -80,40 +77,30 @@ package struct WaxTOC: Equatable, Sendable {
             timeIndex: nil,
             segmentCatalog: SegmentCatalog(),
             ticketRef: TicketRef.emptyV1(),
-            memoryBinding: nil,
             merkleRoot: Data(repeating: 0, count: 32),
             tocChecksum: Data(repeating: 0, count: 32)
         )
     }
 
-    package func encode(cachedFramesPayload: Data? = nil) throws -> Data {
+    public func encode() throws -> Data {
         guard tocVersion == 1 else {
             throw WaxError.encodingError(reason: "unsupported toc_version \(tocVersion)")
         }
         guard frames.count <= Constants.maxArrayCount else {
             throw WaxError.encodingError(reason: "frame count \(frames.count) exceeds limit \(Constants.maxArrayCount)")
         }
+        for (index, frame) in frames.enumerated() {
+            let expected = UInt64(index)
+            guard frame.id == expected else {
+                throw WaxError.encodingError(reason: "frame id not dense: found \(frame.id), expected \(expected)")
+            }
+        }
 
         var encoder = BinaryEncoder()
         encoder.encode(tocVersion)
-
-        if let cachedFramesPayload {
-            guard frames.count <= Int(UInt32.max) else {
-                throw WaxError.encodingError(reason: "frame count \(frames.count) exceeds UInt32.max")
-            }
-            encoder.encode(UInt32(frames.count))
-            encoder.appendRawBytes(cachedFramesPayload)
-        } else {
-            for (index, frame) in frames.enumerated() {
-                let expected = UInt64(index)
-                guard frame.id == expected else {
-                    throw WaxError.encodingError(reason: "frame id not dense: found \(frame.id), expected \(expected)")
-                }
-            }
-            try encoder.encode(frames) { encoder, frame in
-                var mutable = frame
-                try mutable.encode(to: &encoder)
-            }
+        try encoder.encode(frames) { encoder, frame in
+            var mutable = frame
+            try mutable.encode(to: &encoder)
         }
 
         var indexes = indexes
@@ -134,12 +121,7 @@ package struct WaxTOC: Equatable, Sendable {
         var ticketRef = ticketRef
         try ticketRef.encode(to: &encoder)
 
-        if var memoryBinding, !memoryBinding.isEmpty {
-            encoder.encode(UInt8(1))
-            try memoryBinding.encode(to: &encoder)
-        } else {
-            encoder.encode(UInt8(0))
-        }
+        encoder.encode(UInt8(0)) // memory_binding absent in v1
         encoder.encode(UInt8(0)) // replay_manifest absent in v1
         encoder.encode(UInt8(0)) // enrichment_queue absent in v1
 
@@ -155,7 +137,7 @@ package struct WaxTOC: Equatable, Sendable {
         return data
     }
 
-    package static func decode(from tocBytes: Data) throws -> WaxTOC {
+    public static func decode(from tocBytes: Data) throws -> WaxTOC {
         guard tocBytes.count >= 32 else {
             throw WaxError.invalidToc(reason: "toc must be at least 32 bytes (got \(tocBytes.count))")
         }
@@ -211,14 +193,8 @@ package struct WaxTOC: Equatable, Sendable {
         let ticketRef = try TicketRef.decode(from: &decoder)
 
         let memoryBindingTag = try decoder.decode(UInt8.self)
-        let memoryBinding: MemoryBinding?
-        switch memoryBindingTag {
-        case 0:
-            memoryBinding = nil
-        case 1:
-            memoryBinding = try MemoryBinding.decode(from: &decoder)
-        default:
-            throw WaxError.invalidToc(reason: "invalid memory_binding optional tag \(memoryBindingTag)")
+        guard memoryBindingTag == 0 else {
+            throw WaxError.invalidToc(reason: "memory_binding not supported in v1")
         }
         let replayTag = try decoder.decode(UInt8.self)
         guard replayTag == 0 else {
@@ -244,13 +220,12 @@ package struct WaxTOC: Equatable, Sendable {
             timeIndex: timeIndex,
             segmentCatalog: segmentCatalog,
             ticketRef: ticketRef,
-            memoryBinding: memoryBinding,
             merkleRoot: merkleRoot,
             tocChecksum: tocChecksum
         )
     }
 
-    package static func computeChecksum(for tocBytes: Data) -> Data {
+    public static func computeChecksum(for tocBytes: Data) -> Data {
         guard tocBytes.count >= 32 else {
             assertionFailure("toc must be at least 32 bytes")
             return Data(repeating: 0, count: 32)

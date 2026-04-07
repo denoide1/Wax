@@ -1,5 +1,5 @@
 import Foundation
 
-package enum ChunkingStrategy: Sendable, Equatable {
+public enum ChunkingStrategy: Sendable, Equatable {
     case tokenCount(targetTokens: Int, overlapTokens: Int)
 }

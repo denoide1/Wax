@@ -1,320 +1,241 @@
-<!-- HEADER:START -->
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="Resources/docs/assets/banner-dark.svg">
-    <img src="Resources/docs/assets/banner-light.svg" width="800" alt="Wax Banner">
-  </picture>
+<img src="Resources/website/static/img/banner.svg" width="800" alt="Wax Banner" />
+
+<br/>
+
+<img src="https://img.shields.io/badge/Swift-6.2-F05138?style=flat&logo=swift&logoColor=white" />
+<img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS-blue?style=flat&logo=apple" />
+<img src="https://img.shields.io/badge/license-MIT-green?style=flat" />
+<img src="https://img.shields.io/github/stars/christopherkarani/Wax?style=flat" />
+
+<br/><br/>
+
+# 🕯️ Wax
+
+### On-device memory for iOS & macOS AI agents.
+No server. No cloud. One file.
+
+<br/>
+
 </div>
-
-<div style="height: 16px;"></div>
-
-<p align="center">
-  <strong>Wax is a high-performance, single-file memory layer for AI agents on Apple platforms.</strong><br/>
-  On-device, private, and portable. No server and no cloud dependency.
-</p>
-
-<p align="center">
-  <a href="https://github.com/christopherkarani/Wax/releases"><img src="https://img.shields.io/github/v/release/christopherkarani/Wax?style=flat-square&logo=swift&logoColor=white&label=Swift" alt="Swift" /></a>
-  <a href="https://developer.apple.com/ios/"><img src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS-lightgrey?style=flat-square" alt="Platforms" /></a>
-  <a href="https://github.com/christopherkarani/Wax/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/christopherkarani/Wax/stargazers"><img src="https://img.shields.io/github/stars/christopherkarani/Wax?style=flat-square&logo=github" alt="Stars" /></a>
-</p>
-
-<p align="center">
-  <a href="README.md">English</a> · <a href="Resources/locales/README.es.md">Español</a> · <a href="Resources/locales/README.fr.md">Français</a> · <a href="Resources/locales/README.ja.md">日本語</a> · <a href="Resources/locales/README.ko.md">한국어</a> · <a href="Resources/locales/README.pt.md">Português</a> · <a href="Resources/locales/README.zh-CN.md">中文</a>
-</p>
-<!-- HEADER:END -->
 
 ---
 
-## What is Wax?
+Most iOS AI apps lose their memory the moment the user closes them. Wax fixes that — giving your agents persistent, searchable, private memory that lives entirely on-device in a single portable file.
 
-Wax is a Swift-native persistence engine for AI agents. It stores documents, embeddings, and structured knowledge in a single portable `.wax` file.
+```swift
+import Wax
+import WaxVectorSearchMiniLM
 
-The goal is simple: keep memory local, keep setup light, and make recall fast enough that it can stay in the loop.
+let memory = try await MemoryOrchestrator.openMiniLM(
+    at: .documentsDirectory.appending(path: "agent.wax")
+)
 
-### Why Wax?
+// Store a memory
+try await memory.remember("User prefers concise answers and hates bullet points.")
 
-| Feature          | Wax                    | SQLite (FTS5)          | Cloud Vector DBs       |
-|:-----------------|:-----------------------|:-----------------------|:-----------------------|
-| **Search**       | Hybrid (Text + Vector) | Text Only*             | Vector Only*           |
-| **Latency**      | **~6ms (p95)**         | ~10ms (p95)            | 150ms - 500ms+         |
-| **Privacy**      | 100% Local             | 100% Local             | Cloud-hosted           |
-| **Setup**        | Zero Config            | Low                    | Complex (API Keys)     |
-| **Architecture** | Apple Silicon Native   | Generic                | Varies                 |
-
-### Why a single `.wax` file?
-Most RAG setups end up with a database, a vector store, and a file server. Wax keeps the moving pieces smaller by bundling documents, metadata, and indexes into one binary.
-*   **Less setup:** no Docker stack and no separate database to babysit.
-*   **Portable:** move the file with AirDrop, iCloud, or whatever sync layer you already use.
-*   **Atomic:** backup, copy, or delete one file instead of chasing state across services.
+// Retrieve the most relevant context — semantically
+let context = try await memory.recall(query: "communication preferences")
+```
 
 ---
 
 ## Performance
 
-Wax is tuned for M-series hardware and local recall.
+<div align="center">
+<img src="Resources/website/static/img/benchmarks.svg" width="800" alt="Wax Performance Benchmarks" />
+</div>
 
-### Recall Latency (p95)
-*Lower is better. Measured in milliseconds.*
+<br/>
 
-```text
-Wax (Hybrid)  |██ 6.1ms
-SQLite (Text) |████ 12ms
-Cloud RAG     |██████████████████████████████████████████████████ 150ms+
-```
+## Why Wax
 
-### Cold Open Time (p95)
-*Lower is better. Measured in milliseconds.*
+Building AI agents on Apple platforms means juggling Core Data for persistence, FAISS or Annoy for vector search, and a tokenizer for context budgets — none of which talk to each other. Or you spin up Chroma or Pinecone and suddenly your app has a server dependency, network calls, and a privacy story you can't tell users.
 
-```text
-Wax           |███ 9.2ms
-Traditional   |██████████████████████████████████████ 120ms+
-```
+Wax packages all of it into one self-contained file:
 
-> [!TIP]
-> **Ingest Throughput:** Wax handles **85.9 docs/s** with full hybrid indexing on an M3 Max.
-> Full benchmark report: [Resources/docs/benchmarks/2026-03-06-performance-results.md](Resources/docs/benchmarks/2026-03-06-performance-results.md)
+| Capability | Without Wax | With Wax |
+|---|---|---|
+| Document storage | Core Data / SQLite | ✅ Built-in |
+| Semantic search | External FAISS / Annoy | ✅ Built-in (HNSW) |
+| Full-text search | Another index | ✅ Built-in (BM25) |
+| Token budgeting | Manual | ✅ Automatic |
+| Crash safety | You figure it out | ✅ WAL + dual headers |
+| Server required | Often | ✅ Never |
 
 ---
 
 ## Architecture
 
-Wax uses a frame-based container format and embeds the search engines it needs inside the main file: SQLite FTS5 for text and a Metal-accelerated HNSW index for vectors.
+<div align="center">
+<img src="https://raw.githubusercontent.com/christopherkarani/Wax/main/Resources/website/static/img/architecture.svg" width="800" alt="Wax Deep Architecture" />
+</div>
 
-### Internal File Layout
+<br/>
 
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          Dual Header Pages (A/B)                         │
-│   (Magic, Version, Generation, Pointers to WAL & TOC, Checksums)         │
-├──────────────────────────────────────────────────────────────────────────┤
-│                          WAL (Write-Ahead Log)                           │
-│   (Atomic ring buffer for crash-resilient uncommitted mutations)         │
-├──────────────────────────────────────────────────────────────────────────┤
-│                          Compressed Data Frames                          │
-│   ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
-│   │ Frame 0 (LZ4)    │  │ Frame 1 (LZ4)    │  │ Frame 2 (LZ4)    │ ...   │
-│   │ [Raw Document]   │  │ [Metadata/JSON]  │  │ [System Info]    │       │
-│   └──────────────────┘  └──────────────────┘  └──────────────────┘       │
-├──────────────────────────────────────────────────────────────────────────┤
-│                          Hybrid Search Indices                           │
-│   ┌──────────────────────────────┐  ┌──────────────────────────────┐     │
-│   │ SQLite FTS5 Blob             │  │ Metal HNSW Index             │     │
-│   │ (Text Search + EAV Facts)    │  │ (Vector Search)              │     │
-│   └──────────────────────────────┘  └──────────────────────────────┘     │
-├──────────────────────────────────────────────────────────────────────────┤
-│                          TOC (Table of Contents)                         │
-│   (Index of all frames, parent-child relations, and engine manifests)    │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+## Features
 
-1. **Atomic resilience:** dual headers and the WAL keep the store consistent even if the process dies mid-write.
-2. **Unified retrieval:** one query fans out to both the BM25 text index and the HNSW vector index.
-3. **Structured knowledge:** built-in EAV (Entity-Attribute-Value) storage handles durable facts and long-term reasoning.
-
----
-
-## Quick Start
-
-### Swift
-
-```swift
-import Wax
-
-// Use a sandbox-safe, writable location (works in apps and CLI tools)
-let url = URL.documentsDirectory.appending(path: "agent.wax")
-
-// 1. Open a memory store
-let memory = try await Memory(at: url)
-
-// 2. Save a memory
-try await memory.save("The user is building a habit tracker in SwiftUI.")
-
-// 3. Search with hybrid recall (text + vector)
-let results = try await memory.search("What is the user building?")
-
-if let best = results.items.first {
-    print("Found: \(best.text)")
-    print("Document ID: \(best.metadata["id"] ?? "unknown")")
-    // → "Found: The user is building a habit tracker in SwiftUI."
-}
-
-try await memory.close()
-```
-
-<details>
-<summary><strong>SwiftUI example</strong></summary>
-
-```swift
-import SwiftUI
-import Wax
-
-struct ContentView: View {
-    @State private var result = "Searching…"
-
-    var body: some View {
-        Text(result)
-            .task {
-                do {
-                    let url = URL.documentsDirectory.appending(path: "agent.wax")
-                    let memory = try await Memory(at: url)
-
-                    try await memory.save("The user is building a habit tracker in SwiftUI.")
-                    let context = try await memory.search("What is the user building?")
-
-                    result = context.items.first?.text ?? "Nothing found"
-                    try await memory.close()
-                } catch {
-                    result = "Error: \(error.localizedDescription)"
-                }
-            }
-    }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>CLI tool (main.swift)</strong></summary>
-
-```swift
-import Wax
-
-@main
-struct AgentMemory {
-    static func main() async throws {
-        let url = URL.documentsDirectory.appending(path: "agent.wax")
-        let memory = try await Memory(at: url)
-
-        try await memory.save("The user is building a habit tracker in SwiftUI.")
-
-        let results = try await memory.search("What is the user building?")
-        if let best = results.items.first {
-            print("Found: \(best.text)")
-        }
-
-        try await memory.close()
-    }
-}
-```
-
-</details>
-
-Looking to store persistent facts and long-term reasoning? See [Structured Memory](Sources/WaxCore/WaxCore.docc/Articles/StructuredMemory.md).
-
-For repeated CLI vector work, Wax CLI now auto-starts and reuses a background daemon for
-vector-capable commands such as `remember`, `recall`, and `search --mode hybrid`.
-
-You can still run the daemon directly when you want an explicit long-lived session:
-
-```bash
-wax-cli daemon --store-path ~/.wax/memory.wax
-```
-
-Send JSON lines such as:
-
-```json
-{"id":"1","command":"remember","content":"An automobile needs periodic maintenance."}
-{"id":"2","command":"search","query":"car service","mode":"hybrid","topK":3}
-{"id":"3","command":"shutdown"}
-```
-
-Simple text-only usage still runs one-shot. If vector search is unavailable, hybrid/vector
-commands now fail loudly instead of silently dropping to text-only mode.
-
-### AI Coding Assistants
-
-If you use an AI coding assistant like **Claude Code**, **Cursor**, or **Windsurf**, there are two good setup paths:
-
-- Use the **Wax MCP server** when you want persistent memory, session handoffs, and cross-session search inside the assistant.
-- Use the bundled **Wax skill** when you want the assistant to write correct Wax framework code directly against the Swift API.
-
-**Install the MCP server (Claude Code):**
-
-```bash
-npx -y waxmcp@latest mcp install --scope user
-```
-
-This install flow stages the bundled Wax runtime into a stable local directory and
-registers the staged `wax-mcp` binary with Claude Code. `npx` is only used for install/bootstrap.
-
-**Install the skill (Claude Code):**
-
-```bash
-# From within your project directory
-claude install-skill https://github.com/christopherkarani/Wax/tree/main/Resources/skills/public/wax
-```
-
-Once installed, your assistant can work against `Memory`, `VideoRAGOrchestrator`, `PhotoRAGOrchestrator`, hybrid search, structured memory, and the MCP server without extra prompt scaffolding.
-
-**Or paste this prompt to get started from scratch:**
-
-<details>
-<summary>Wax starter prompt (click to expand, then copy)</summary>
-
-```text
-Use the Wax MCP server for persistent memory in this repo.
-
-Workflow rules:
-- At session start, call `wax_handoff_latest` first to load prior context, then call `wax_session_start` once and keep the returned `session_id`.
-- Use `wax_remember` to store decisions, discoveries, and short factual notes. If the memory is session-scoped, pass `session_id` as a top-level argument. Do not put `session_id` inside `metadata`.
-- Use `wax_recall` for assembled context and `wax_search` for raw ranked hits.
-- Prefer `mode: "hybrid"` when semantic retrieval helps. Use `mode: "text"` when I want a fast or deterministic lexical lookup.
-- If you batch writes with `commit: false`, call `wax_flush` before any `wax_recall` or `wax_search`.
-- Use `wax_handoff` near the end of the session with `content`, optional `project`, and `pending_tasks`, then call `wax_session_end`.
-- Use `wax_corpus_search` only when you need cross-session retrieval across many session `.wax` files, such as `~/.wax/sessions`. It rebuilds or refreshes a shared corpus store and returns provenance metadata under `wax.corpus.*` so you can trace hits back to the source session store and frame.
-- Use structured memory tools (`wax_entity_upsert`, `wax_fact_assert`, `wax_fact_retract`, `wax_facts_query`, `wax_entity_resolve`) for stable entities and facts, not transient debugging notes.
-
-Behavior expectations:
-- Read existing handoffs and recall results before asking me to restate prior context.
-- Keep memory writes concise, factual, and scoped to the task.
-- When a cross-session result looks relevant, cite the provenance metadata so we know which session store it came from.
-```
-
-</details>
+- **Hybrid retrieval** — BM25 keyword search fused with HNSW vector similarity. Gets the right memory, even when wording differs.
+- **On-device embeddings** — Powered by MiniLM, running locally. No API calls, no latency, no cost.
+- **Metal acceleration** — Embedding and search use Apple Silicon GPU when available.
+- **Token budgets** — Set a hard limit. Wax automatically trims and compresses context to fit, every time.
+- **Tiered surrogates** — Store full text, a gist, or a micro-summary. Trade recall for speed at query time.
+- **Single portable file** — The whole memory store is one `.wax` file. Back it up, sync it, move it.
+- **Crash-safe by design** — Append-only format with write-ahead logging and dual headers. No corruption on unexpected exits.
+- **Swift 6 concurrency** — Fully `async/await` native with `Sendable` conformances throughout.
 
 ---
 
 ## Installation
 
-### Swift Package Manager
+**Swift Package Manager**
 
 ```swift
+// Package.swift
 dependencies: [
     .package(url: "https://github.com/christopherkarani/Wax.git", from: "0.1.8")
+],
+targets: [
+    .target(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "Wax", package: "Wax"),
+            .product(name: "WaxVectorSearchMiniLM", package: "Wax")
+        ]
+    )
 ]
 ```
 
----
+Or in Xcode: **File → Add Package Dependencies** → paste the repo URL.
 
-## Ecosystem Tools
-
-### 🤖 MCP Server
-Wax provides a first-class **Model Context Protocol (MCP)** server. Connect your local memory to Claude Code or any MCP-compatible agent.
+## MCP Installer (npm)
 
 ```bash
 npx -y waxmcp@latest mcp install --scope user
 ```
 
-The published installer stages the bundled runtime into a stable local directory and
-registers `wax-mcp` directly, so steady-state MCP sessions do not launch through raw `npx`.
-For the recommended Claude Code prompt and setup flow, see [Resources/docs/wax-mcp-setup.md](Resources/docs/wax-mcp-setup.md).
+## Claude Code Integration
 
-### 🔍 WaxRepo
-A semantic search TUI for your git history. Index any repository and find code or commits using natural language.
+After installing the MCP server, add this to your `CLAUDE.md` so Claude Code uses Wax as its memory:
 
-```bash
-# From within any git repo
-wax-repo index
-wax-repo search "where did we implement the WAL?"
+<details>
+<summary><strong>CLAUDE.md snippet</strong> (click to expand)</summary>
+
+```markdown
+# Memory — Wax
+
+Wax MCP is installed. Store: `~/.wax/memory.wax`.
+
+## Rules
+
+1. **Session start** — call `wax_handoff_latest` to resume prior context
+2. **Before answering** — call `wax_recall` to check what you already know. Always try this first.
+3. **When you learn something durable** — call `wax_remember`. Worth storing: user preferences, project decisions, architectural patterns, conventions, people/roles. Not worth storing: transient debugging, one-off commands.
+4. **When corrected** — call `wax_forget` with what changed (e.g. "we don't use Redux anymore")
+5. **Session end** — call `wax_handoff` with summary + pending tasks
+
+## Tools
+
+| Tool | When |
+|------|------|
+| `wax_remember` | User states a preference, makes a decision, or you learn a stable pattern. `project` to scope. |
+| `wax_recall` | Before answering anything that might have prior context. Use `graph: true` for relationship-aware search. |
+| `wax_forget` | User corrects you or facts become outdated. Natural language or `fact_id`. |
+| `wax_context` | Need the full picture of a specific entity (person, project, library). |
+| `wax_reflect` | Audit what you know — entity counts, top predicates, memory health. |
+| `wax_handoff` | Session ending. Pass `pending_tasks` array for continuity. |
+| `wax_handoff_latest` | Session starting. Loads last handoff. |
+```
+
+</details>
+
+---
+
+## Quick Start
+
+```swift
+import Wax
+import WaxVectorSearchMiniLM
+
+// 1. Open (or create) a memory store
+let memory = try await MemoryOrchestrator.openMiniLM(
+    at: .documentsDirectory.appending(path: "myagent.wax")
+)
+
+// 2. Store memories
+try await memory.remember("The user's name is Alex and they live in Toronto.")
+try await memory.remember("Alex dislikes formal language. Keep responses casual.")
+try await memory.remember("Alex is building a habit tracker in SwiftUI.")
+
+// 3. Retrieve relevant context for a prompt
+let context = try await memory.recall(query: "how should I address the user?")
+print(context.items.map(\.text))
 ```
 
 ---
 
+## Use Cases
+
+- **Conversational agents** that remember preferences, history, and facts across sessions
+- **Note-taking apps** with semantic search ("find everything I wrote about WWDC")
+- **Photo & video apps** that index captions and transcripts for natural-language lookup
+- **Personal assistants** that learn user habits without sending data off-device
+- **RAG pipelines** built entirely on-device for sensitive or offline-first applications
+
+---
+
+## Requirements
+
+| | Minimum |
+|---|---|
+| Swift | 6.2 |
+| iOS | 17.0 |
+| macOS | 14.0 |
+| Xcode | 16.0 |
+
+Apple Silicon recommended for GPU-accelerated embedding. Intel Macs fall back to CPU seamlessly.
+
+---
+
+## Comparison
+
+| | Wax | ChromaDB | Pinecone | Core Data + FAISS |
+|---|---|---|---|---|
+| On-device | ✅ | ❌ | ❌ | ✅ |
+| No server | ✅ | ❌ | ❌ | ✅ |
+| Hybrid search | ✅ | ✅ | ✅ | Manual |
+| Token budgeting | ✅ | ❌ | ❌ | ❌ |
+| Single file | ✅ | ❌ | ❌ | ❌ |
+| Swift-native API | ✅ | ❌ | ❌ | Partial |
+| Privacy (data stays on device) | ✅ | ❌ | ❌ | ✅ |
+
+---
+
+## Roadmap
+
+- [ ] CloudKit sync (opt-in, encrypted)
+- [ ] iCloud Drive `.wax` document support
+- [ ] Memory clustering and deduplication
+- [ ] Quantized embedding models for smaller footprint
+- [ ] Instruments template for memory profiling
+
+---
+
+## Contributing
+
+Issues and PRs are welcome. If you're building something with Wax, open a Discussion — would love to see what you're working on.
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=christopherkarani/wax&type=date&legend=top-left)](https://www.star-history.com/#christopherkarani/wax&type=date&legend=top-left)
+
 ## License
 
-Wax is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Apache 2.0 © [Christopher Karani](https://github.com/christopherkarani)
+
+---
 
 <div align="center">
 <sub>Built for developers who believe user data belongs on the user's device.</sub>

@@ -23,33 +23,33 @@ private func posixKill(_ pid: Int32, _ signal: Int32) -> Int32 {
     #endif
 }
 
-package struct WaxStats: Equatable, Sendable {
-    package var frameCount: UInt64
-    package var pendingFrames: UInt64
-    package var generation: UInt64
+public struct WaxStats: Equatable, Sendable {
+    public var frameCount: UInt64
+    public var pendingFrames: UInt64
+    public var generation: UInt64
 
-    package init(frameCount: UInt64, pendingFrames: UInt64, generation: UInt64) {
+    public init(frameCount: UInt64, pendingFrames: UInt64, generation: UInt64) {
         self.frameCount = frameCount
         self.pendingFrames = pendingFrames
         self.generation = generation
     }
 }
 
-package struct WaxWALStats: Equatable, Sendable {
-    package var walSize: UInt64
-    package var writePos: UInt64
-    package var checkpointPos: UInt64
-    package var pendingBytes: UInt64
-    package var committedSeq: UInt64
-    package var lastSeq: UInt64
-    package var wrapCount: UInt64
-    package var checkpointCount: UInt64
-    package var sentinelWriteCount: UInt64
-    package var writeCallCount: UInt64
-    package var autoCommitCount: UInt64
-    package var replaySnapshotHitCount: UInt64
+public struct WaxWALStats: Equatable, Sendable {
+    public var walSize: UInt64
+    public var writePos: UInt64
+    public var checkpointPos: UInt64
+    public var pendingBytes: UInt64
+    public var committedSeq: UInt64
+    public var lastSeq: UInt64
+    public var wrapCount: UInt64
+    public var checkpointCount: UInt64
+    public var sentinelWriteCount: UInt64
+    public var writeCallCount: UInt64
+    public var autoCommitCount: UInt64
+    public var replaySnapshotHitCount: UInt64
 
-    package init(
+    public init(
         walSize: UInt64,
         writePos: UInt64,
         checkpointPos: UInt64,
@@ -78,68 +78,13 @@ package struct WaxWALStats: Equatable, Sendable {
     }
 }
 
-package struct PendingEmbeddingSnapshot: Equatable, Sendable {
-    package let embeddings: [PutEmbedding]
-    package let latestSequence: UInt64?
+public struct PendingEmbeddingSnapshot: Equatable, Sendable {
+    public let embeddings: [PutEmbedding]
+    public let latestSequence: UInt64?
 
-    package init(embeddings: [PutEmbedding], latestSequence: UInt64?) {
+    public init(embeddings: [PutEmbedding], latestSequence: UInt64?) {
         self.embeddings = embeddings
         self.latestSequence = latestSequence
-    }
-}
-
-package struct RememberDedupEmbeddingIdentity: Equatable, Sendable {
-    package var provider: String?
-    package var model: String?
-    package var dimensions: Int?
-    package var normalized: Bool?
-
-    package init(
-        provider: String? = nil,
-        model: String? = nil,
-        dimensions: Int? = nil,
-        normalized: Bool? = nil
-    ) {
-        self.provider = provider
-        self.model = model
-        self.dimensions = dimensions
-        self.normalized = normalized
-    }
-
-    fileprivate func matches(metadataEntries: [String: String]) -> Bool {
-        if let provider, metadataEntries["wax.embedding.provider"] != provider {
-            return false
-        }
-        if let model, metadataEntries["wax.embedding.model"] != model {
-            return false
-        }
-        if let dimensions, metadataEntries["wax.embedding.dimension"] != String(dimensions) {
-            return false
-        }
-        if let normalized, metadataEntries["wax.embedding.normalized"] != String(normalized) {
-            return false
-        }
-        return true
-    }
-}
-
-package struct RememberDedupProbe: Equatable, Sendable {
-    package var documentId: UInt64
-    package var isComplete: Bool
-
-    package init(documentId: UInt64, isComplete: Bool) {
-        self.documentId = documentId
-        self.isComplete = isComplete
-    }
-}
-
-package struct SurrogateSourceFrame: Equatable, Sendable {
-    package var id: UInt64
-    package var searchText: String
-
-    package init(id: UInt64, searchText: String) {
-        self.id = id
-        self.searchText = searchText
     }
 }
 
@@ -147,7 +92,7 @@ package struct SurrogateSourceFrame: Equatable, Sendable {
 ///
 /// Holds the file descriptor, lock, header, TOC, and in-memory index state.
 /// All mutable state is isolated within this actor for thread safety.
-package actor Wax {
+public actor Wax {
     private enum CrashInjectionCheckpoint: String {
         case afterTocWriteBeforeFooter = "after_toc_write_before_footer"
         case afterFooterWriteBeforeFsync = "after_footer_write_before_fsync"
@@ -171,8 +116,6 @@ package actor Wax {
     private var surrogateIndex: [UInt64: UInt64]? = nil
     private var wal: WALRingWriter
     private var pendingMutations: [PendingMutation]
-    private var pendingMutationSummary: PendingMutationSummary
-    private var encodedCommittedFramePayloadCache: Data?
     private var stagedLexIndex: StagedLexIndex?
     private var stagedVecIndex: StagedVecIndex?
     private var stagedLexIndexStamp: UInt64?
@@ -207,7 +150,6 @@ package actor Wax {
         toc: WaxTOC,
         wal: WALRingWriter,
         pendingMutations: [PendingMutation],
-        encodedCommittedFramePayloadCache: Data?,
         stagedLexIndex: StagedLexIndex?,
         stagedVecIndex: StagedVecIndex?,
         stagedLexIndexStamp: UInt64?,
@@ -233,8 +175,6 @@ package actor Wax {
         self.toc = toc
         self.wal = wal
         self.pendingMutations = pendingMutations
-        self.pendingMutationSummary = PendingMutationSummary.from(pendingMutations)
-        self.encodedCommittedFramePayloadCache = encodedCommittedFramePayloadCache
         self.stagedLexIndex = stagedLexIndex
         self.stagedVecIndex = stagedVecIndex
         self.stagedLexIndexStamp = stagedLexIndexStamp
@@ -277,7 +217,11 @@ package actor Wax {
     }
 
     private func canAutoCommitForWalPressureLocked() -> Bool {
-        !(pendingMutationSummary.hasPendingEmbedding && stagedVecIndex == nil)
+        let hasPendingEmbedding = pendingMutations.contains { mutation in
+            if case .putEmbedding = mutation.entry { return true }
+            return false
+        }
+        return !(hasPendingEmbedding && stagedVecIndex == nil)
     }
 
     private func estimatedWalBytesForAppend(payloadSize: Int) -> UInt64? {
@@ -366,7 +310,7 @@ package actor Wax {
 
     // MARK: - Writer lease
 
-    package func acquireWriterLease(policy: WaxWriterPolicy) async throws -> UUID {
+    public func acquireWriterLease(policy: WaxWriterPolicy) async throws -> UUID {
         if let _ = writerLeaseId {
             switch policy {
             case .fail:
@@ -383,7 +327,7 @@ package actor Wax {
         return leaseId
     }
 
-    package func releaseWriterLease(_ leaseId: UUID) {
+    public func releaseWriterLease(_ leaseId: UUID) {
         guard writerLeaseId == leaseId else { return }
 
         if writerWaiters.isEmpty {
@@ -450,17 +394,8 @@ package actor Wax {
         max(1, minPendingBytes)
     }
 
-    private static func applyDataProtectionIfSupported(at url: URL) throws {
-        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        try FileManager.default.setAttributes(
-            [.protectionKey: FileProtectionType.complete],
-            ofItemAtPath: url.path
-        )
-        #endif
-    }
-
     /// Create a new, empty `.wax` file.
-    package static func create(
+    public static func create(
         at url: URL,
         walSize: UInt64 = Constants.defaultWalSize,
         options: WaxOptions = .init()
@@ -481,11 +416,7 @@ package actor Wax {
             let file = try FDFile.create(at: url)
             let lock: FileLock
             do {
-                lock = try FileLock.acquire(
-                    at: url,
-                    mode: .exclusive,
-                    timeout: options.lockWaitTimeout
-                )
+                lock = try FileLock.acquire(at: url, mode: .exclusive)
             } catch {
                 try? file.close()
                 throw error
@@ -547,7 +478,7 @@ package actor Wax {
             )
         }
 
-        let wax = Wax(
+        return Wax(
             url: url,
             io: io,
             file: created.file,
@@ -557,7 +488,6 @@ package actor Wax {
             toc: created.toc,
             wal: created.wal,
             pendingMutations: [],
-            encodedCommittedFramePayloadCache: Data(),
             stagedLexIndex: nil,
             stagedVecIndex: nil,
             stagedLexIndexStamp: nil,
@@ -584,20 +514,13 @@ package actor Wax {
             ),
             walReplayStateSnapshotEnabled: options.walReplayStateSnapshotEnabled
         )
-        do {
-            try Self.applyDataProtectionIfSupported(at: url)
-        } catch {
-            try? await wax.close()
-            throw error
-        }
-        return wax
     }
 
     /// Open an existing `.wax` file.
     ///
     /// By default, Wax will repair trailing bytes beyond the last valid footer while preserving any
     /// uncommitted payload bytes referenced by the pending WAL.
-    package static func open(at url: URL, options: WaxOptions = .init()) async throws -> Wax {
+    public static func open(at url: URL, options: WaxOptions = .init()) async throws -> Wax {
         try await open(at: url, repair: true, options: options)
     }
 
@@ -607,7 +530,7 @@ package actor Wax {
     /// smallest safe end offset:
     /// - `footerOffset + footerSize` (latest committed state), and
     /// - the highest `payloadOffset + payloadLength` referenced by the pending WAL (to preserve uncommitted puts).
-    package static func open(at url: URL, repair: Bool, options: WaxOptions = .init()) async throws -> Wax {
+    public static func open(at url: URL, repair: Bool, options: WaxOptions = .init()) async throws -> Wax {
         let io = BlockingIOExecutor(label: options.ioQueueLabel, qos: options.ioQueueQos)
         let opened = try await io.run { () throws -> (
             file: FDFile,
@@ -622,11 +545,7 @@ package actor Wax {
             dirty: Bool,
             replaySnapshotUsed: Bool
         ) in
-            let lock = try FileLock.acquire(
-                at: url,
-                mode: .exclusive,
-                timeout: options.lockWaitTimeout
-            )
+            let lock = try FileLock.acquire(at: url, mode: .exclusive)
             let file = try FDFile.open(at: url)
 
             let pageA = try file.readExactly(length: Int(Constants.headerPageSize), at: 0)
@@ -654,29 +573,9 @@ package actor Wax {
             } else {
                 snapshotFooter = nil
             }
-            var fileSize = try file.size()
 
             let footerSlice: FooterSlice
-            let shouldScanForNewerFooter: Bool = {
-                guard let fastFooter else { return true }
-                guard selectedHeaderFileGeneration == fastFooter.footer.generation else { return true }
-                guard header.tocChecksum == fastFooter.footer.tocHash else { return true }
-                let expectedEnd = fastFooter.footerOffset + Constants.footerSize
-                guard fileSize == expectedEnd else { return true }
-                if let snapshotFooter {
-                    if snapshotFooter.footer.generation > fastFooter.footer.generation {
-                        return true
-                    }
-                    if snapshotFooter.footer.generation == fastFooter.footer.generation,
-                       snapshotFooter.footerOffset > fastFooter.footerOffset {
-                        return true
-                    }
-                }
-                return false
-            }()
-            let scannedFooter = shouldScanForNewerFooter
-                ? try FooterScanner.findLastValidFooter(in: url)
-                : nil
+            let scannedFooter = try FooterScanner.findLastValidFooter(in: url)
             var footerCandidates: [FooterSlice] = []
             footerCandidates.reserveCapacity(3)
             if let fastFooter {
@@ -783,6 +682,7 @@ package actor Wax {
                 if end > requiredEnd { requiredEnd = end }
             }
 
+            var fileSize = try file.size()
             guard requiredEnd <= fileSize else {
                 throw WaxError.invalidToc(reason: "pending WAL references bytes beyond file size")
             }
@@ -807,7 +707,7 @@ package actor Wax {
             )
         }
 
-        let wax = Wax(
+        return Wax(
             url: url,
             io: io,
             file: opened.file,
@@ -817,7 +717,6 @@ package actor Wax {
             toc: opened.toc,
             wal: opened.wal,
             pendingMutations: opened.pendingMutations,
-            encodedCommittedFramePayloadCache: nil,
             stagedLexIndex: nil,
             stagedVecIndex: nil,
             stagedLexIndexStamp: nil,
@@ -844,37 +743,12 @@ package actor Wax {
             ),
             walReplayStateSnapshotEnabled: options.walReplayStateSnapshotEnabled
         )
-        do {
-            try Self.applyDataProtectionIfSupported(at: url)
-        } catch {
-            try? await wax.close()
-            throw error
-        }
-        return wax
     }
 
     // MARK: - Mutations
 
     private func currentTimestampMs() -> Int64 {
         Int64(Date().timeIntervalSince1970 * 1000)
-    }
-
-    private func appendPendingMutation(sequence: UInt64, entry: WALEntry) {
-        let mutation = PendingMutation(sequence: sequence, entry: entry)
-        pendingMutations.append(mutation)
-        pendingMutationSummary.record(mutation)
-    }
-
-    private func clearPendingMutations() {
-        pendingMutations.removeAll(keepingCapacity: true)
-        pendingMutationSummary = PendingMutationSummary()
-    }
-
-    private func orderedPendingMutationsLocked() -> [PendingMutation] {
-        if pendingMutationSummary.isOrderedBySequence {
-            return pendingMutations
-        }
-        return pendingMutations.sorted { $0.sequence < $1.sequence }
     }
 
     private func putLocked(
@@ -884,7 +758,10 @@ package actor Wax {
         compression: CanonicalEncoding
     ) async throws -> UInt64 {
         let committedCount = UInt64(toc.frames.count)
-        let pendingPutCount = pendingMutationSummary.putFrameCount
+        let pendingPutCount = pendingMutations.reduce(0) { count, mutation in
+            if case .putFrame = mutation.entry { return count + 1 }
+            return count
+        }
         let frameId = committedCount + UInt64(pendingPutCount)
 
         let canonicalChecksum = SHA256Checksum.digest(content)
@@ -931,12 +808,12 @@ package actor Wax {
         }
 
         dataEnd += UInt64(storedBytes.count)
-        appendPendingMutation(sequence: seq, entry: entry)
+        pendingMutations.append(PendingMutation(sequence: seq, entry: entry))
         dirty = true
         return frameId
     }
 
-    package func put(
+    public func put(
         _ content: Data,
         options: FrameMetaSubset = .init(),
         compression: CanonicalEncoding = .plain
@@ -946,7 +823,7 @@ package actor Wax {
         }
     }
 
-    package func put(
+    public func put(
         _ content: Data,
         options: FrameMetaSubset = .init(),
         compression: CanonicalEncoding = .plain,
@@ -964,7 +841,10 @@ package actor Wax {
         compression: CanonicalEncoding
     ) async throws -> [UInt64] {
         let committedCount = UInt64(toc.frames.count)
-        let pendingPutCount = pendingMutationSummary.putFrameCount
+        let pendingPutCount = pendingMutations.reduce(0) { count, mutation in
+            if case .putFrame = mutation.entry { return count + 1 }
+            return count
+        }
         let baseFrameId = committedCount + UInt64(pendingPutCount)
         let defaultTimestampMs = Int64(Date().timeIntervalSince1970 * 1000)
 
@@ -1043,7 +923,7 @@ package actor Wax {
                     return try wal.append(payload: walPayload)
                 }
                 dataEnd += UInt64(frame.storedBytes.count)
-                appendPendingMutation(sequence: seq, entry: entry)
+                pendingMutations.append(PendingMutation(sequence: seq, entry: entry))
                 frameIds.append(putFrame.frameId)
             }
             dirty = true
@@ -1111,7 +991,7 @@ package actor Wax {
         // Update state
         dataEnd = currentOffset
         for (index, entry) in entries.enumerated() {
-            appendPendingMutation(sequence: sequences[index], entry: entry)
+            pendingMutations.append(PendingMutation(sequence: sequences[index], entry: entry))
         }
         dirty = true
 
@@ -1121,7 +1001,7 @@ package actor Wax {
     /// Batch put multiple frames in a single operation.
     /// This amortizes actor and I/O overhead across all frames.
     /// Returns frame IDs in the same order as the input contents.
-    package func putBatch(
+    public func putBatch(
         _ contents: [Data],
         options: [FrameMetaSubset],
         compression: CanonicalEncoding = .plain
@@ -1138,7 +1018,7 @@ package actor Wax {
 
     /// Batch put multiple frames with caller-provided timestamps.
     /// The `timestampsMs` array must match `contents` order and length.
-    package func putBatch(
+    public func putBatch(
         _ contents: [Data],
         options: [FrameMetaSubset],
         compression: CanonicalEncoding = .plain,
@@ -1158,7 +1038,7 @@ package actor Wax {
     }
 
     /// Batch put embeddings for multiple frames in a single operation.
-    package func putEmbeddingBatch(frameIds: [UInt64], vectors: [[Float]]) async throws {
+    public func putEmbeddingBatch(frameIds: [UInt64], vectors: [[Float]]) async throws {
         guard !frameIds.isEmpty else { return }
         guard frameIds.count == vectors.count else {
             throw WaxError.encodingError(reason: "putEmbeddingBatch: frameIds.count != vectors.count")
@@ -1235,13 +1115,13 @@ package actor Wax {
 
             // Update state
             for (index, entry) in entries.enumerated() {
-                appendPendingMutation(sequence: sequences[index], entry: entry)
+                pendingMutations.append(PendingMutation(sequence: sequences[index], entry: entry))
             }
             dirty = true
         }
     }
 
-    package func putEmbedding(frameId: UInt64, vector: [Float]) async throws {
+    public func putEmbedding(frameId: UInt64, vector: [Float]) async throws {
         try await withWriteLock {
             guard !vector.isEmpty else {
                 throw WaxError.encodingError(reason: "embedding vector must be non-empty")
@@ -1281,21 +1161,18 @@ package actor Wax {
             let seq = try await io.run {
                 try wal.append(payload: payload)
             }
-            appendPendingMutation(sequence: seq, entry: entry)
+            pendingMutations.append(PendingMutation(sequence: seq, entry: entry))
             dirty = true
         }
     }
 
-    package func pendingEmbeddingMutations() async -> [PutEmbedding] {
+    public func pendingEmbeddingMutations() async -> [PutEmbedding] {
         let snapshot = await pendingEmbeddingMutations(since: nil)
         return snapshot.embeddings
     }
 
-    package func pendingEmbeddingMutations(since sequence: UInt64?) async -> PendingEmbeddingSnapshot {
+    public func pendingEmbeddingMutations(since sequence: UInt64?) async -> PendingEmbeddingSnapshot {
         await withReadLock {
-            guard pendingMutationSummary.hasPendingEmbedding else {
-                return PendingEmbeddingSnapshot(embeddings: [], latestSequence: nil)
-            }
             var embeddings: [PutEmbedding] = []
             embeddings.reserveCapacity(pendingMutations.count)
             var latestSequence: UInt64?
@@ -1309,7 +1186,7 @@ package actor Wax {
         }
     }
 
-    package func delete(frameId: UInt64) async throws {
+    public func delete(frameId: UInt64) async throws {
         try await withWriteLock {
             let entry = WALEntry.deleteFrame(DeleteFrame(frameId: frameId))
             let payload = try WALEntryCodec.encode(entry)
@@ -1318,12 +1195,12 @@ package actor Wax {
             let seq = try await io.run {
                 try wal.append(payload: payload)
             }
-            appendPendingMutation(sequence: seq, entry: entry)
+            pendingMutations.append(PendingMutation(sequence: seq, entry: entry))
             dirty = true
         }
     }
 
-    package func supersede(supersededId: UInt64, supersedingId: UInt64) async throws {
+    public func supersede(supersededId: UInt64, supersedingId: UInt64) async throws {
         try await withWriteLock {
             // Check committed state for reverse relationship
             if supersededId < UInt64(toc.frames.count) {
@@ -1355,12 +1232,12 @@ package actor Wax {
             let seq = try await io.run {
                 try wal.append(payload: payload)
             }
-            appendPendingMutation(sequence: seq, entry: entry)
+            pendingMutations.append(PendingMutation(sequence: seq, entry: entry))
             dirty = true
         }
     }
 
-    package func pendingFrameMeta(frameId: UInt64) async -> FrameMeta? {
+    public func pendingFrameMeta(frameId: UInt64) async -> FrameMeta? {
         await withReadLock {
             let maxCommittedId = UInt64(toc.frames.count)
             guard frameId >= maxCommittedId else { return nil }
@@ -1368,7 +1245,7 @@ package actor Wax {
         }
     }
 
-    package func stageLexIndexForNextCommit(bytes: Data, docCount: UInt64, version: UInt32 = 1) async throws {
+    public func stageLexIndexForNextCommit(bytes: Data, docCount: UInt64, version: UInt32 = 1) async throws {
         try await withWriteLock {
             guard version == 1 else {
                 throw WaxError.invalidToc(reason: "unsupported lex index version \(version)")
@@ -1388,10 +1265,11 @@ package actor Wax {
             let bytesLength = UInt64(byteCount)
 
             if let stagedLexIndex {
+                let stagedChecksum = SHA256Checksum.digest(stagedLexIndex.bytes)
                 if stagedLexIndex.docCount == docCount,
                    stagedLexIndex.version == version,
                    UInt64(stagedLexIndex.bytes.count) == bytesLength,
-                   stagedLexIndex.checksum == checksum {
+                   stagedChecksum == checksum {
                     return
                 }
             }
@@ -1406,19 +1284,14 @@ package actor Wax {
                 return
             }
 
-            stagedLexIndex = StagedLexIndex(
-                bytes: bytes,
-                docCount: docCount,
-                version: version,
-                checksum: checksum
-            )
+            stagedLexIndex = StagedLexIndex(bytes: bytes, docCount: docCount, version: version)
             stagedLexIndexStampCounter &+= 1
             stagedLexIndexStamp = stagedLexIndexStampCounter
             dirty = true
         }
     }
 
-    package func stageVecIndexForNextCommit(
+    public func stageVecIndexForNextCommit(
         bytes: Data,
         vectorCount: UInt64,
         dimension: UInt32,
@@ -1458,35 +1331,29 @@ package actor Wax {
                 }
             }
 
-            let pendingEmbeddingMaxSequence = pendingMutationSummary.latestPendingEmbeddingSequence
-            if pendingMutationSummary.hasPendingEmbedding {
-                let matchesDimension = !pendingMutationSummary.pendingEmbeddingHasMixedDimensions
-                    && pendingMutationSummary.pendingEmbeddingDimension == dimension
-                guard matchesDimension else {
-                    let actualDimension: String
-                    if pendingMutationSummary.pendingEmbeddingHasMixedDimensions {
-                        actualDimension = "mixed"
-                    } else if let pendingDimension = pendingMutationSummary.pendingEmbeddingDimension {
-                        actualDimension = String(pendingDimension)
-                    } else {
-                        actualDimension = "none"
-                    }
+            let ordered = pendingMutations.sorted { $0.sequence < $1.sequence }
+            var pendingEmbeddingMaxSequence: UInt64?
+            for mutation in ordered {
+                guard case .putEmbedding(let embedding) = mutation.entry else { continue }
+                guard embedding.dimension == dimension else {
                     throw WaxError.invalidToc(
-                        reason: "pending embedding dimension mismatch vs staged vec index: expected \(dimension), got \(actualDimension)"
+                        reason: "pending embedding dimension mismatch vs staged vec index: expected \(dimension), got \(embedding.dimension)"
                     )
                 }
+                pendingEmbeddingMaxSequence = mutation.sequence
             }
 
             let checksum = SHA256Checksum.digest(bytes)
             let bytesLength = UInt64(byteCount)
 
             if let stagedVecIndex {
+                let stagedChecksum = SHA256Checksum.digest(stagedVecIndex.bytes)
                 if stagedVecIndex.vectorCount == vectorCount,
                    stagedVecIndex.dimension == dimension,
                    stagedVecIndex.similarity == similarity,
                    stagedVecIndex.pendingEmbeddingMaxSequence == pendingEmbeddingMaxSequence,
                    UInt64(stagedVecIndex.bytes.count) == bytesLength,
-                   stagedVecIndex.checksum == checksum {
+                   stagedChecksum == checksum {
                     return
                 }
             }
@@ -1508,8 +1375,7 @@ package actor Wax {
                 vectorCount: vectorCount,
                 dimension: dimension,
                 similarity: similarity,
-                pendingEmbeddingMaxSequence: pendingEmbeddingMaxSequence,
-                checksum: checksum
+                pendingEmbeddingMaxSequence: pendingEmbeddingMaxSequence
             )
             stagedVecIndexStampCounter &+= 1
             stagedVecIndexStamp = stagedVecIndexStampCounter
@@ -1517,7 +1383,7 @@ package actor Wax {
         }
     }
 
-    package func commit() async throws {
+    public func commit() async throws {
         try await withWriteLock {
             try await commitLocked()
         }
@@ -1527,11 +1393,18 @@ package actor Wax {
         guard dirty || stagedLexIndex != nil || stagedVecIndex != nil else { return }
 
         if stagedVecIndex == nil {
-            if pendingMutationSummary.hasPendingEmbedding {
+            let hasPendingEmbedding = pendingMutations.contains { mutation in
+                if case .putEmbedding = mutation.entry { return true }
+                return false
+            }
+            if hasPendingEmbedding {
                 throw WaxError.io("vector index must be staged before committing embeddings")
             }
         } else if let stagedVecIndex {
-            let latestPendingEmbeddingSequence = pendingMutationSummary.latestPendingEmbeddingSequence
+            let latestPendingEmbeddingSequence = pendingMutations.reduce(nil as UInt64?) { current, mutation in
+                guard case .putEmbedding = mutation.entry else { return current }
+                return mutation.sequence
+            }
             if latestPendingEmbeddingSequence != stagedVecIndex.pendingEmbeddingMaxSequence {
                 throw WaxError.io(
                     "vector index is stale relative to pending embeddings; restage vector index before commit"
@@ -1539,12 +1412,7 @@ package actor Wax {
             }
         }
 
-        let applied = try applyPendingMutationsIntoTOC()
-        let appliedWalSeq = applied.maxSequence
-        let cachedFramesPayload = try encodedCommittedFramePayloadForCommit(
-            appendedFrames: applied.appendedFrames,
-            invalidated: applied.modifiedCommittedFrames
-        )
+        let appliedWalSeq = try applyPendingMutationsIntoTOC()
 
         let file = self.file
         if let staged = stagedLexIndex {
@@ -1562,11 +1430,12 @@ package actor Wax {
             let lexLength = UInt64(byteCount)
             dataEnd += lexLength
 
+            let checksum = SHA256Checksum.digest(staged.bytes)
             toc.indexes.lex = LexIndexManifest(
                 docCount: staged.docCount,
                 bytesOffset: lexOffset,
                 bytesLength: lexLength,
-                checksum: staged.checksum,
+                checksum: checksum,
                 version: staged.version
             )
             let segmentId = nextSegmentId()
@@ -1574,7 +1443,7 @@ package actor Wax {
                 segmentId: segmentId,
                 bytesOffset: lexOffset,
                 bytesLength: lexLength,
-                checksum: staged.checksum,
+                checksum: checksum,
                 compression: .none,
                 kind: .lex
             )
@@ -1597,12 +1466,13 @@ package actor Wax {
             let vecLength = UInt64(byteCount)
             dataEnd += vecLength
 
+            let checksum = SHA256Checksum.digest(staged.bytes)
             toc.indexes.vec = VecIndexManifest(
                 vectorCount: staged.vectorCount,
                 dimension: staged.dimension,
                 bytesOffset: vecOffset,
                 bytesLength: vecLength,
-                checksum: staged.checksum,
+                checksum: checksum,
                 similarity: staged.similarity
             )
             let segmentId = nextSegmentId()
@@ -1610,14 +1480,14 @@ package actor Wax {
                 segmentId: segmentId,
                 bytesOffset: vecOffset,
                 bytesLength: vecLength,
-                checksum: staged.checksum,
+                checksum: checksum,
                 compression: .none,
                 kind: .vec
             )
             toc.segmentCatalog.entries.append(entry)
         }
 
-        let tocBytes = try toc.encode(cachedFramesPayload: cachedFramesPayload)
+        let tocBytes = try toc.encode()
         let tocChecksum = tocBytes.suffix(32)
         toc.tocChecksum = Data(tocChecksum)
 
@@ -1681,7 +1551,7 @@ package actor Wax {
             wal.recordCheckpoint()
         }
 
-        clearPendingMutations()
+        pendingMutations.removeAll()
         stagedLexIndex = nil
         stagedVecIndex = nil
         stagedLexIndexStamp = nil
@@ -1694,212 +1564,13 @@ package actor Wax {
 
     // MARK: - Reads
 
-    package func frameMetas() async -> [FrameMeta] {
+    public func frameMetas() async -> [FrameMeta] {
         await withReadLock {
             toc.frames
         }
     }
 
-    package func activeFrameIDs(
-        matchingMetadataKey key: String,
-        value: String
-    ) async -> [UInt64] {
-        await withReadLock {
-            var frameIDs: [UInt64] = []
-            frameIDs.reserveCapacity(toc.frames.count)
-
-            for frame in toc.frames {
-                guard frame.status == .active, frame.supersededBy == nil else { continue }
-                guard frame.metadata?.entries[key] == value else { continue }
-                frameIDs.append(frame.id)
-            }
-
-            return frameIDs
-        }
-    }
-
-    package func latestCommittedActiveSystemFrameMeta(
-        kind: String,
-        fallbackMetadataKey: String,
-        fallbackMetadataValue: String
-    ) async -> FrameMeta? {
-        await withReadLock {
-            var latest: FrameMeta?
-
-            for frame in toc.frames {
-                guard frame.status == .active, frame.supersededBy == nil, frame.role == .system else {
-                    continue
-                }
-                guard frame.kind == kind
-                    || frame.metadata?.entries[fallbackMetadataKey] == fallbackMetadataValue else {
-                    continue
-                }
-                guard latest?.timestamp ?? .min < frame.timestamp else { continue }
-                latest = frame
-            }
-
-            return latest
-        }
-    }
-
-    package func latestCommittedActiveHandoffMeta(project: String? = nil) async -> FrameMeta? {
-        await withReadLock {
-            var latest: FrameMeta?
-
-            for frame in toc.frames {
-                guard frame.status == .active, frame.supersededBy == nil else { continue }
-
-                let hasHandoffKind = frame.kind == "handoff" || frame.metadata?.entries["kind"] == "handoff"
-                let hasHandoffLabel = frame.labels.contains("handoff")
-                guard hasHandoffKind || hasHandoffLabel else { continue }
-
-                if let project, !project.isEmpty, frame.metadata?.entries["project"] != project {
-                    continue
-                }
-
-                guard let current = latest else {
-                    latest = frame
-                    continue
-                }
-
-                if frame.timestamp > current.timestamp
-                    || (frame.timestamp == current.timestamp && frame.id > current.id) {
-                    latest = frame
-                }
-            }
-
-            return latest
-        }
-    }
-
-    package func committedPayloadLivenessBytes() async -> (
-        totalPayloadBytes: UInt64,
-        deadPayloadBytes: UInt64
-    ) {
-        await withReadLock {
-            var totalPayloadBytes: UInt64 = 0
-            var deadPayloadBytes: UInt64 = 0
-
-            for frame in toc.frames where frame.payloadLength > 0 {
-                totalPayloadBytes &+= frame.payloadLength
-                let isLive = frame.status == .active && frame.supersededBy == nil
-                if !isLive {
-                    deadPayloadBytes &+= frame.payloadLength
-                }
-            }
-
-            return (totalPayloadBytes, deadPayloadBytes)
-        }
-    }
-
-    package func activeSurrogateSourceFrames() async -> [SurrogateSourceFrame] {
-        await withReadLock {
-            var sources: [SurrogateSourceFrame] = []
-            sources.reserveCapacity(toc.frames.count)
-
-            for frame in toc.frames {
-                guard frame.status == .active, frame.supersededBy == nil else { continue }
-                guard frame.role == .chunk else { continue }
-                guard frame.kind != "surrogate" else { continue }
-                guard let searchText = frame.searchText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !searchText.isEmpty else {
-                    continue
-                }
-                sources.append(.init(id: frame.id, searchText: searchText))
-            }
-
-            return sources
-        }
-    }
-
-    package func rememberDedupProbe(
-        contentHash: String,
-        metadata: [String: String],
-        expectedChunkCount: Int,
-        embeddingIdentity: RememberDedupEmbeddingIdentity?
-    ) async -> RememberDedupProbe? {
-        await withReadLock {
-            struct ChunkCoverage {
-                var count = 0
-                var indices: Set<Int> = []
-                var indicesAreValid = true
-                var chunkCountsMatch = true
-                var embeddingIdentityMatches = true
-
-                mutating func record(
-                    _ chunk: FrameMeta,
-                    expectedChunkCount: Int,
-                    embeddingIdentity: RememberDedupEmbeddingIdentity?
-                ) {
-                    count += 1
-                    guard expectedChunkCount > 0 else { return }
-
-                    guard let chunkCount = chunk.chunkCount, Int(chunkCount) == expectedChunkCount else {
-                        chunkCountsMatch = false
-                        return
-                    }
-                    guard let chunkIndex = chunk.chunkIndex else {
-                        indicesAreValid = false
-                        return
-                    }
-
-                    let index = Int(chunkIndex)
-                    guard (0..<expectedChunkCount).contains(index) else {
-                        indicesAreValid = false
-                        return
-                    }
-                    guard indices.insert(index).inserted else {
-                        indicesAreValid = false
-                        return
-                    }
-
-                    if let embeddingIdentity,
-                       embeddingIdentity.matches(metadataEntries: chunk.metadata?.entries ?? [:]) == false {
-                        embeddingIdentityMatches = false
-                    }
-                }
-
-                func isComplete(expectedChunkCount: Int) -> Bool {
-                    guard expectedChunkCount > 0 else { return true }
-                    guard count == expectedChunkCount else { return false }
-                    guard indices.count == expectedChunkCount else { return false }
-                    return indicesAreValid && chunkCountsMatch && embeddingIdentityMatches
-                }
-            }
-
-            var chunkCoverageByDocument: [UInt64: ChunkCoverage] = [:]
-
-            for meta in toc.frames.reversed() {
-                guard meta.status == .active, meta.supersededBy == nil else { continue }
-
-                if meta.role == .chunk, let parentId = meta.parentId {
-                    var coverage = chunkCoverageByDocument[parentId] ?? ChunkCoverage()
-                    coverage.record(
-                        meta,
-                        expectedChunkCount: expectedChunkCount,
-                        embeddingIdentity: embeddingIdentity
-                    )
-                    chunkCoverageByDocument[parentId] = coverage
-                    continue
-                }
-
-                guard meta.role == .document else { continue }
-                guard let entries = meta.metadata?.entries else { continue }
-                guard entries["wax.content.hash"] == contentHash else { continue }
-                guard entries == metadata else { continue }
-
-                let coverage = chunkCoverageByDocument[meta.id] ?? ChunkCoverage()
-                return RememberDedupProbe(
-                    documentId: meta.id,
-                    isComplete: coverage.isComplete(expectedChunkCount: expectedChunkCount)
-                )
-            }
-
-            return nil
-        }
-    }
-
-    package func frameMetas(frameIds: [UInt64]) async -> [UInt64: FrameMeta] {
+    public func frameMetas(frameIds: [UInt64]) async -> [UInt64: FrameMeta] {
         await withReadLock {
             var metas: [UInt64: FrameMeta] = [:]
             metas.reserveCapacity(frameIds.count)
@@ -1911,13 +1582,13 @@ package actor Wax {
         }
     }
 
-    package func frameMetasIncludingPending(frameIds: [UInt64]) async -> [UInt64: FrameMeta] {
+    public func frameMetasIncludingPending(frameIds: [UInt64]) async -> [UInt64: FrameMeta] {
         await withReadLock {
             frameMetasIncludingPendingUnlocked(frameIds: frameIds)
         }
     }
 
-    package func surrogateFrameId(sourceFrameId: UInt64) async -> UInt64? {
+    public func surrogateFrameId(sourceFrameId: UInt64) async -> UInt64? {
         await withReadLock {
             if surrogateIndex == nil {
                 surrogateIndex = buildSurrogateIndexUnlocked()
@@ -1927,7 +1598,7 @@ package actor Wax {
     }
 
     /// Batch lookup of surrogate frame ids to avoid repeated actor hops.
-    package func surrogateFrameIds(for sourceFrameIds: [UInt64]) async -> [UInt64: UInt64] {
+    public func surrogateFrameIds(for sourceFrameIds: [UInt64]) async -> [UInt64: UInt64] {
         await withReadLock {
             if surrogateIndex == nil {
                 surrogateIndex = buildSurrogateIndexUnlocked()
@@ -1944,13 +1615,13 @@ package actor Wax {
         }
     }
 
-    package func frameMeta(frameId: UInt64) async throws -> FrameMeta {
+    public func frameMeta(frameId: UInt64) async throws -> FrameMeta {
         try await withReadLock {
             try frameMetaUnlocked(frameId: frameId)
         }
     }
 
-    package func frameMetaIncludingPending(frameId: UInt64) async throws -> FrameMeta {
+    public func frameMetaIncludingPending(frameId: UInt64) async throws -> FrameMeta {
         try await withReadLock {
             let metas = frameMetasIncludingPendingUnlocked(frameIds: [frameId])
             guard let meta = metas[frameId] else {
@@ -1960,13 +1631,13 @@ package actor Wax {
         }
     }
 
-    package func frameContent(frameId: UInt64) async throws -> Data {
+    public func frameContent(frameId: UInt64) async throws -> Data {
         try await withReadLock {
             try await frameContentUnlocked(frameId: frameId)
         }
     }
 
-    package func frameContentIncludingPending(frameId: UInt64) async throws -> Data {
+    public func frameContentIncludingPending(frameId: UInt64) async throws -> Data {
         try await withReadLock {
             let metas = frameMetasIncludingPendingUnlocked(frameIds: [frameId])
             guard let meta = metas[frameId] else {
@@ -1976,7 +1647,7 @@ package actor Wax {
         }
     }
 
-    package func framePreview(frameId: UInt64, maxBytes: Int) async throws -> Data {
+    public func framePreview(frameId: UInt64, maxBytes: Int) async throws -> Data {
         try await withReadLock {
             let clampedMax = max(0, maxBytes)
             if clampedMax == 0 { return Data() }
@@ -2000,7 +1671,7 @@ package actor Wax {
         }
     }
 
-    package func framePreviews(frameIds: [UInt64], maxBytes: Int) async throws -> [UInt64: Data] {
+    public func framePreviews(frameIds: [UInt64], maxBytes: Int) async throws -> [UInt64: Data] {
         struct PlainPreviewPlan: Sendable {
             let frameId: UInt64
             let offset: UInt64
@@ -2061,16 +1732,11 @@ package actor Wax {
             previews[frameId] = Data()
         }
 
-        if !plainPlans.isEmpty {
-            let plainPreviewBytes = try await io.run {
-                var bytesByFrameId: [UInt64: Data] = [:]
-                bytesByFrameId.reserveCapacity(plainPlans.count)
-                for plan in plainPlans {
-                    bytesByFrameId[plan.frameId] = try file.readExactly(length: plan.length, at: plan.offset)
-                }
-                return bytesByFrameId
+        for plan in plainPlans {
+            let bytes = try await io.run {
+                try file.readExactly(length: plan.length, at: plan.offset)
             }
-            previews.merge(plainPreviewBytes, uniquingKeysWith: { _, new in new })
+            previews[plan.frameId] = bytes
         }
 
         for frame in compressedFrames {
@@ -2082,7 +1748,7 @@ package actor Wax {
     }
 
     /// Batch read full frame contents (committed only) in a single actor hop.
-    package func frameContents(frameIds: [UInt64]) async throws -> [UInt64: Data] {
+    public func frameContents(frameIds: [UInt64]) async throws -> [UInt64: Data] {
         try await withReadLock {
             var contents: [UInt64: Data] = [:]
             contents.reserveCapacity(frameIds.count)
@@ -2102,13 +1768,13 @@ package actor Wax {
         }
     }
 
-    package func frameStoredContent(frameId: UInt64) async throws -> Data {
+    public func frameStoredContent(frameId: UInt64) async throws -> Data {
         try await withReadLock {
             try await frameStoredContentUnlocked(frameId: frameId)
         }
     }
 
-    package func frameStoredPreview(frameId: UInt64, maxBytes: Int) async throws -> Data {
+    public func frameStoredPreview(frameId: UInt64, maxBytes: Int) async throws -> Data {
         try await withReadLock {
             let frame = try frameMetaUnlocked(frameId: frameId)
             if frame.payloadLength == 0 { return Data() }
@@ -2268,7 +1934,7 @@ package actor Wax {
         return metas
     }
 
-    package func readCommittedLexIndexBytes() async throws -> Data? {
+    public func readCommittedLexIndexBytes() async throws -> Data? {
         try await withReadLock {
             guard let manifest = toc.indexes.lex else { return nil }
             guard manifest.version == 1 else {
@@ -2327,25 +1993,25 @@ package actor Wax {
         return index
     }
 
-    package func committedLexIndexManifest() async -> LexIndexManifest? {
+    public func committedLexIndexManifest() async -> LexIndexManifest? {
         await withReadLock {
             toc.indexes.lex
         }
     }
 
-    package func readStagedLexIndexBytes() async -> Data? {
+    public func readStagedLexIndexBytes() async -> Data? {
         await withReadLock {
             stagedLexIndex?.bytes
         }
     }
 
-    package func stagedLexIndexStamp() async -> UInt64? {
+    public func stagedLexIndexStamp() async -> UInt64? {
         await withReadLock {
             stagedLexIndexStamp
         }
     }
 
-    package func readCommittedVecIndexBytes() async throws -> Data? {
+    public func readCommittedVecIndexBytes() async throws -> Data? {
         try await withReadLock {
             guard let manifest = toc.indexes.vec else { return nil }
             guard manifest.bytesLength > 0 else { return nil }
@@ -2381,51 +2047,28 @@ package actor Wax {
         }
     }
 
-    package func readStagedVecIndexBytes() async -> (bytes: Data, dimension: UInt32, similarity: VecSimilarity)? {
+    public func readStagedVecIndexBytes() async -> (bytes: Data, dimension: UInt32, similarity: VecSimilarity)? {
         await withReadLock {
             guard let staged = stagedVecIndex else { return nil }
             return (bytes: staged.bytes, dimension: staged.dimension, similarity: staged.similarity)
         }
     }
 
-    package func stagedVecIndexStamp() async -> UInt64? {
+    public func stagedVecIndexStamp() async -> UInt64? {
         await withReadLock {
             stagedVecIndexStamp
         }
     }
 
-    package func committedVecIndexManifest() async -> VecIndexManifest? {
+    public func committedVecIndexManifest() async -> VecIndexManifest? {
         await withReadLock {
             toc.indexes.vec
         }
     }
 
-    package func memoryBinding() async -> MemoryBinding? {
-        await withReadLock {
-            toc.memoryBinding
-        }
-    }
-
-    package func setMemoryBindingIfMissing(_ binding: MemoryBinding) async throws {
-        try await withWriteLock {
-            guard !binding.isEmpty else { return }
-            guard toc.memoryBinding == nil else { return }
-            toc.memoryBinding = binding
-            dirty = true
-        }
-    }
-
-    package func overwriteMemoryBindingForTesting(_ binding: MemoryBinding?) async throws {
-        try await withWriteLock {
-            guard toc.memoryBinding != binding else { return }
-            toc.memoryBinding = binding
-            dirty = true
-        }
-    }
-
     // MARK: - Introspection
 
-    package func stats() async -> WaxStats {
+    public func stats() async -> WaxStats {
         await withReadLock {
             let pending = pendingMutations.reduce(0) { count, mutation in
                 if case .putFrame = mutation.entry { return count + 1 }
@@ -2439,11 +2082,11 @@ package actor Wax {
         }
     }
 
-    package func fileURL() -> URL {
+    public func fileURL() -> URL {
         url
     }
 
-    package func walStats() async -> WaxWALStats {
+    public func walStats() async -> WaxWALStats {
         await withReadLock {
             WaxWALStats(
                 walSize: wal.walSize,
@@ -2462,7 +2105,7 @@ package actor Wax {
         }
     }
 
-    package func timeline(_ query: TimelineQuery) async -> [FrameMeta] {
+    public func timeline(_ query: TimelineQuery) async -> [FrameMeta] {
         await withReadLock {
             TimelineQuery.filter(frames: toc.frames, query: query)
         }
@@ -2473,11 +2116,11 @@ package actor Wax {
     /// Verify the file on disk.
     ///
     /// This is equivalent to `verify(deep: true)`. Use `verify(deep: false)` for a structural-only check.
-    package func verify() async throws {
+    public func verify() async throws {
         try await verify(deep: true)
     }
 
-    package func verify(deep: Bool) async throws {
+    public func verify(deep: Bool) async throws {
         try await withReadLock {
             let file = self.file
             let pageA = try await io.run {
@@ -2586,7 +2229,7 @@ package actor Wax {
         }
     }
 
-    package func close() async throws {
+    public func close() async throws {
         try await withWriteLock {
             var commitError: Error?
             if dirty || stagedLexIndex != nil || stagedVecIndex != nil {
@@ -2653,20 +2296,13 @@ package actor Wax {
         selectedHeaderPageIndex = nextIndex
     }
 
-    private struct AppliedPendingMutations {
-        var maxSequence: UInt64
-        var appendedFrames: [FrameMeta]
-        var modifiedCommittedFrames: Bool
-    }
-
-    private func applyPendingMutationsIntoTOC() throws -> AppliedPendingMutations {
+    private func applyPendingMutationsIntoTOC() throws -> UInt64 {
         let committedSeq = header.walCommittedSeq
         var maxSeq = committedSeq
 
         let stagedVecDimension = stagedVecIndex?.dimension
-        let ordered = orderedPendingMutationsLocked()
+        let ordered = pendingMutations.sorted { $0.sequence < $1.sequence }
         var newFrames: [FrameMeta] = []
-        var modifiedCommittedFrames = false
 
         func withFrame(_ frameId: UInt64, _ update: (inout FrameMeta) throws -> Void) throws {
             let committedCount = toc.frames.count
@@ -2675,7 +2311,6 @@ package actor Wax {
                 throw WaxError.invalidToc(reason: "mutation references unknown frameId \(frameId) (known < \(maxKnown))")
             }
             if frameId < UInt64(committedCount) {
-                modifiedCommittedFrames = true
                 try update(&toc.frames[Int(frameId)])
             } else {
                 let index = Int(frameId - UInt64(committedCount))
@@ -2742,23 +2377,16 @@ package actor Wax {
         }
 
         if !newFrames.isEmpty {
-            let originalCount = toc.frames.count
-            // Validate after appending in place so commit does not clone the full frame array first.
-            toc.frames.append(contentsOf: newFrames)
+            var all = toc.frames
+            all.append(contentsOf: newFrames)
             let dataStart = header.walOffset + header.walSize
-            do {
-                try Self.validateTocRanges(toc, dataStart: dataStart, dataEnd: dataEnd)
-            } catch {
-                toc.frames.removeLast(toc.frames.count - originalCount)
-                throw error
-            }
+            var candidate = toc
+            candidate.frames = all
+            try Self.validateTocRanges(candidate, dataStart: dataStart, dataEnd: dataEnd)
+            toc.frames.append(contentsOf: newFrames)
         }
 
-        return AppliedPendingMutations(
-            maxSequence: maxSeq,
-            appendedFrames: newFrames,
-            modifiedCommittedFrames: modifiedCommittedFrames
-        )
+        return maxSeq
     }
 
     private struct DataRange {
@@ -2771,7 +2399,6 @@ package actor Wax {
         var bytes: Data
         var docCount: UInt64
         var version: UInt32
-        var checksum: Data
     }
 
     private struct StagedVecIndex {
@@ -2780,49 +2407,6 @@ package actor Wax {
         var dimension: UInt32
         var similarity: VecSimilarity
         var pendingEmbeddingMaxSequence: UInt64?
-        var checksum: Data
-    }
-
-    private struct PendingMutationSummary {
-        var putFrameCount: UInt64 = 0
-        var hasPendingEmbedding = false
-        var latestPendingEmbeddingSequence: UInt64?
-        var pendingEmbeddingDimension: UInt32?
-        var pendingEmbeddingHasMixedDimensions = false
-        var isOrderedBySequence = true
-
-        private var lastSequence: UInt64?
-
-        mutating func record(_ mutation: PendingMutation) {
-            if let lastSequence, mutation.sequence <= lastSequence {
-                isOrderedBySequence = false
-            }
-            self.lastSequence = mutation.sequence
-
-            switch mutation.entry {
-            case .putFrame:
-                putFrameCount &+= 1
-            case .putEmbedding(let embedding):
-                hasPendingEmbedding = true
-                latestPendingEmbeddingSequence = mutation.sequence
-                if let pendingEmbeddingDimension, pendingEmbeddingDimension != embedding.dimension {
-                    pendingEmbeddingHasMixedDimensions = true
-                } else {
-                    pendingEmbeddingDimension = embedding.dimension
-                }
-            case .deleteFrame, .supersedeFrame:
-                break
-            }
-        }
-
-        static func from(_ mutations: [PendingMutation]) -> PendingMutationSummary {
-            var summary = PendingMutationSummary()
-            summary.putFrameCount = 0
-            for mutation in mutations {
-                summary.record(mutation)
-            }
-            return summary
-        }
     }
 
     private func nextSegmentId() -> UInt64 {
@@ -2830,37 +2414,6 @@ package actor Wax {
             return maxId &+ 1
         }
         return 0
-    }
-
-    private func encodedCommittedFramePayloadForCommit(
-        appendedFrames: [FrameMeta],
-        invalidated: Bool
-    ) throws -> Data {
-        if invalidated {
-            encodedCommittedFramePayloadCache = nil
-        }
-
-        if encodedCommittedFramePayloadCache == nil {
-            encodedCommittedFramePayloadCache = try Self.encodeFramePayloads(toc.frames)
-            return encodedCommittedFramePayloadCache ?? Data()
-        }
-
-        if !appendedFrames.isEmpty {
-            encodedCommittedFramePayloadCache?.append(try Self.encodeFramePayloads(appendedFrames))
-        }
-
-        return encodedCommittedFramePayloadCache ?? Data()
-    }
-
-    private static func encodeFramePayloads(_ frames: [FrameMeta]) throws -> Data {
-        guard !frames.isEmpty else { return Data() }
-
-        var encoder = BinaryEncoder()
-        for frame in frames {
-            var mutable = frame
-            try mutable.encode(to: &encoder)
-        }
-        return encoder.data
     }
 
     private static func validateTocRanges(_ toc: WaxTOC, dataStart: UInt64, dataEnd: UInt64) throws {

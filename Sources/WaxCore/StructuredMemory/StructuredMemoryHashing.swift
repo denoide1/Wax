@@ -1,8 +1,8 @@
 import Foundation
 
 /// Hashing utilities for structured memory deduplication and span identity.
-package enum StructuredMemoryHasher {
-    package static func hashFact(
+public enum StructuredMemoryHasher {
+    public static func hashFact(
         subject: EntityKey,
         predicate: PredicateKey,
         object: FactValue,
@@ -25,7 +25,7 @@ package enum StructuredMemoryHasher {
         return SHA256Checksum.digest(buffer.data)
     }
 
-    package static func hashSpanKey(
+    public static func hashSpanKey(
         factId: FactRowID,
         valid: StructuredTimeRange,
         systemFromMs: Int64
